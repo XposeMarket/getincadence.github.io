@@ -192,3 +192,193 @@ body {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* =====================================================
+   PRINT STYLES
+   ===================================================== */
+@media print {
+  /* NUCLEAR: Hide everything except the report content */
+  body > *:not(#__next),
+  header,
+  nav,
+  aside,
+  [role="navigation"],
+  [role="banner"],
+  .print\\:hidden,
+  [class*="print:hidden"],
+  button,
+  .btn,
+  /* Dashboard shell elements */
+  [class*="sidebar"],
+  [class*="Sidebar"],
+  [class*="header"],
+  [class*="Header"],
+  [class*="search"],
+  [class*="Search"],
+  [class*="Quick Add"],
+  /* Hide the entire dashboard header row */
+  .flex.items-center.justify-between.h-16,
+  /* Bell icon, avatar, etc */
+  [class*="notification"],
+  [class*="avatar"] {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Hide scrollbars completely */
+  * {
+    overflow: visible !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+  *::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  /* Reset body and html */
+  html, body {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Make the main content fill the page with no margins */
+  main,
+  [role="main"],
+  #__next,
+  #__next > * {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
+  }
+
+  /* Scale down and compact the report */
+  .space-y-4,
+  .space-y-6 {
+    gap: 8px !important;
+  }
+  .space-y-4 > *,
+  .space-y-6 > * {
+    margin-bottom: 8px !important;
+  }
+
+  /* Compact cards */
+  .card,
+  [data-report-section] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    box-shadow: none !important;
+    border: 1px solid #d1d5db !important;
+    margin-bottom: 8px !important;
+    padding: 8px 12px !important;
+  }
+
+  /* Smaller text for print */
+  h1 {
+    font-size: 16pt !important;
+    margin-bottom: 4px !important;
+  }
+  h2 {
+    font-size: 11pt !important;
+    margin-bottom: 4px !important;
+  }
+  h3 {
+    font-size: 10pt !important;
+  }
+  p, span, td, th, li {
+    font-size: 9pt !important;
+  }
+  .text-xs {
+    font-size: 8pt !important;
+  }
+  .text-sm {
+    font-size: 9pt !important;
+  }
+  .text-lg, .text-xl, .text-2xl {
+    font-size: 12pt !important;
+  }
+  .text-3xl, .text-4xl, .text-5xl {
+    font-size: 14pt !important;
+  }
+
+  /* Compact grids */
+  .grid {
+    gap: 8px !important;
+  }
+  .grid-cols-2 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .lg\\:grid-cols-2,
+  .lg\\:grid-cols-4 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .sm\\:grid-cols-3 {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+
+  /* Compact stat cards */
+  .card.p-3,
+  .card.p-4,
+  .card.p-6 {
+    padding: 6px 10px !important;
+  }
+
+  /* Force background colors to print */
+  .badge,
+  [class*="bg-"],
+  [style*="backgroundColor"] {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Remove hover states and interactive styling */
+  a {
+    text-decoration: none !important;
+    color: inherit !important;
+  }
+
+  /* Hide empty state emoji */
+  .text-gray-500:has(🎉) {
+    display: none;
+  }
+
+  /* Limit list heights and show all items */
+  .max-h-64 {
+    max-height: none !important;
+  }
+
+  /* Table compacting */
+  table {
+    font-size: 8pt !important;
+  }
+  th, td {
+    padding: 4px 8px !important;
+  }
+
+  /* Page setup */
+  @page {
+    margin: 0.5in;
+    size: letter;
+  }
+
+  /* Add print header with date */
+  .space-y-4::before,
+  .space-y-6::before {
+    content: "Cadence CRM Report";
+    display: block;
+    font-size: 10pt;
+    color: #6b7280;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+}

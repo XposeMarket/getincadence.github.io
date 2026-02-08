@@ -6,7 +6,7 @@ import { getCurrentUserOrgId } from '@/lib/org-helpers'
 import { 
   BarChart3, TrendingUp, TrendingDown, DollarSign, Users, Handshake, 
   CheckSquare, Calendar, ArrowUpRight, ArrowDownRight, Loader2, 
-  AlertTriangle, Clock, User, ExternalLink
+  AlertTriangle, Clock, User, ExternalLink, Printer, X, FileText
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatDistanceToNow, subDays, format } from 'date-fns'
@@ -83,6 +83,63 @@ const getFirst = <T,>(data: T[] | T | null | undefined): T | null => {
   return Array.isArray(data) ? data[0] || null : data
 }
 
+// ========== PRINT CONFIGURATION ==========
+type SectionKey = 
+  | 'stats' | 'pipeline' | 'dealsByOwner' | 'idleDeals3to7' | 'idleDeals7plus'
+  | 'overdueTasks' | 'incompleteTasks' | 'topDeals' | 'winMetrics'
+  | 'dealsLost' | 'stageTimings' | 'funnel' | 'velocity' | 'forecast'
+
+interface ReportSection {
+  key: SectionKey
+  label: string
+  description: string
+}
+
+const REPORT_SECTIONS: ReportSection[] = [
+  { key: 'stats', label: 'KPI Summary', description: 'Revenue, contacts, deals won, tasks completed' },
+  { key: 'pipeline', label: 'Pipeline Overview', description: 'Deal count and value by stage' },
+  { key: 'dealsByOwner', label: 'Deals by Owner', description: 'Deal distribution across team' },
+  { key: 'winMetrics', label: 'Win Rate & Metrics', description: 'Win rate, avg deal size, sales cycle' },
+  { key: 'funnel', label: 'Conversion Funnel', description: 'Stage-to-stage progression' },
+  { key: 'velocity', label: 'Sales Velocity', description: 'Revenue throughput per day' },
+  { key: 'forecast', label: 'Forecast Pipeline', description: 'Weighted revenue projection' },
+  { key: 'dealsLost', label: 'Deals Lost', description: 'Loss reasons and recent losses' },
+  { key: 'stageTimings', label: 'Avg Time in Stage', description: 'How long deals stay per stage' },
+  { key: 'topDeals', label: 'Top Open Deals', description: 'Highest value open deals' },
+  { key: 'idleDeals3to7', label: 'Idle Deals (3-7 Days)', description: 'Deals with no recent activity' },
+  { key: 'idleDeals7plus', label: 'Idle Deals (7+ Days)', description: 'Stale deals needing attention' },
+  { key: 'overdueTasks', label: 'Overdue Tasks', description: 'Tasks past their due date' },
+  { key: 'incompleteTasks', label: 'Incomplete Tasks', description: 'All pending tasks' },
+]
+
+interface PrintPreset {
+  name: string
+  description: string
+  icon: typeof FileText
+  sections: SectionKey[]
+}
+
+const PRINT_PRESETS: PrintPreset[] = [
+  {
+    name: 'Executive Summary',
+    description: 'High-level KPIs and revenue outlook',
+    icon: BarChart3,
+    sections: ['stats', 'winMetrics', 'pipeline', 'forecast', 'funnel'],
+  },
+  {
+    name: 'Pipeline Health',
+    description: 'Where deals are and where they stall',
+    icon: TrendingUp,
+    sections: ['pipeline', 'funnel', 'stageTimings', 'velocity', 'idleDeals3to7', 'idleDeals7plus'],
+  },
+  {
+    name: 'Full Report',
+    description: 'Every section included',
+    icon: FileText,
+    sections: REPORT_SECTIONS.map(s => s.key),
+  },
+]
+
 export default function ReportsPage() {
   const [timeRange, setTimeRange] = useState<TimeRange>('30d')
   const [loading, setLoading] = useState(true)
@@ -130,6 +187,21 @@ export default function ReportsPage() {
   
   // Avg time in stage
   const [stageTimings, setStageTimings] = useState<{ stage: string; avgDays: number; color: string; dealCount: number }[]>([])
+  
+  // Conversion funnel
+  const [funnelData, setFunnelData] = useState<{ stage: string; count: number; color: string; conversionRate: number; dropOff: number }[]>([])
+  
+  // Sales velocity
+  const [salesVelocity, setSalesVelocity] = useState(0)
+  
+  // Forecast pipeline
+  const [forecastData, setForecastData] = useState<{ stage: string; count: number; rawValue: number; weightedValue: number; color: string; weight: number }[]>([])
+  const [totalForecast, setTotalForecast] = useState(0)
+  
+  // Print modal
+  const [showPrintModal, setShowPrintModal] = useState(false)
+  const [selectedSections, setSelectedSections] = useState<Set<SectionKey>>(new Set(REPORT_SECTIONS.map(s => s.key)))
+  const [activePreset, setActivePreset] = useState<string>('Full Report')
   
   const supabase = createClient()
 
@@ -539,6 +611,101 @@ export default function ReportsPage() {
         })
       setStageTimings(timings)
 
+      // ========== CONVERSION FUNNEL ==========
+      // For each active stage (sorted by position), count how many deals ever reached it
+      // Since we don't have stage history, we approximate:
+      // - Deals in stage N or beyond = they passed through stages 1..N-1
+      const activeStagesForFunnel = stages
+        .filter(s => !s.is_won && !s.is_lost)
+        .sort((a, b) => a.position - b.position)
+      
+      const wonStage = stages.find(s => s.is_won)
+      const lostStage = stages.find(s => s.is_lost)
+
+      if (activeStagesForFunnel.length > 0) {
+        // First pass: count deals that reached each stage
+        const stageCounts: number[] = activeStagesForFunnel.map((stage, index) => {
+          const laterStagePositions = activeStagesForFunnel
+            .filter((_, i) => i >= index)
+            .map(s => s.id)
+          
+          const dealsReachedStage = deals.filter(d => {
+            if (laterStagePositions.includes(d.stage_id)) return true
+            const dealStage = getFirst(d.pipeline_stages)
+            if (dealStage?.is_won || dealStage?.is_lost) return true
+            return false
+          }).length
+
+          return index === 0 ? deals.length : dealsReachedStage
+        })
+
+        // Second pass: build funnel with conversion rates
+        const funnel = activeStagesForFunnel.map((stage, index) => {
+          const count = stageCounts[index]
+          const prevCount = index === 0 ? deals.length : stageCounts[index - 1]
+          const conversionRate = index === 0 ? 100 : (prevCount > 0 ? Math.round((count / prevCount) * 100) : 0)
+          const dropOff = index === 0 ? 0 : (prevCount > 0 ? Math.round(((prevCount - count) / prevCount) * 100) : 0)
+
+          return {
+            stage: stage.name,
+            count,
+            color: stage.color,
+            conversionRate,
+            dropOff
+          }
+        })
+
+        setFunnelData(funnel)
+      }
+
+      // ========== SALES VELOCITY ==========
+      // Formula: (# of deals × avg deal value × win rate %) / avg sales cycle (days)
+      // Result = $ per day flowing through pipeline
+      const numDeals = closedDeals.length
+      const avgDealVal = wonDealsForAvg.length > 0
+        ? wonDealsForAvg.reduce((sum, d) => sum + (d.amount || 0), 0) / wonDealsForAvg.length
+        : 0
+      const winRateDecimal = closedDeals.length > 0 ? wonDealsCount / closedDeals.length : 0
+      const cycleLength = wonDealsWithDates.length > 0
+        ? wonDealsWithDates.reduce((sum, d) => {
+            const created = new Date(d.created_at)
+            const closed = new Date(d.updated_at)
+            return sum + Math.max(1, Math.ceil((closed.getTime() - created.getTime()) / (1000 * 60 * 60 * 24)))
+          }, 0) / wonDealsWithDates.length
+        : 1
+      
+      const velocity = (numDeals * avgDealVal * winRateDecimal) / Math.max(cycleLength, 1)
+      setSalesVelocity(Math.round(velocity))
+
+      // ========== FORECAST PIPELINE ==========
+      // Weight open deals by stage position (earlier = lower weight, later = higher)
+      const openDealsForForecast = deals.filter(d => {
+        const stage = getFirst(d.pipeline_stages)
+        return !stage?.is_won && !stage?.is_lost
+      })
+
+      if (activeStagesForFunnel.length > 0) {
+        const forecast = activeStagesForFunnel.map((stage, index) => {
+          const stageDeals = openDealsForForecast.filter(d => d.stage_id === stage.id)
+          const rawValue = stageDeals.reduce((sum, d) => sum + (d.amount || 0), 0)
+          // Weight increases by stage position: first stage ~20%, last stage ~90%
+          const weight = Math.round(20 + ((index / Math.max(activeStagesForFunnel.length - 1, 1)) * 70))
+          const weightedValue = Math.round(rawValue * (weight / 100))
+
+          return {
+            stage: stage.name,
+            count: stageDeals.length,
+            rawValue,
+            weightedValue,
+            color: stage.color,
+            weight
+          }
+        })
+
+        setForecastData(forecast)
+        setTotalForecast(forecast.reduce((sum, f) => sum + f.weightedValue, 0))
+      }
+
     } catch (error) {
       console.error('Failed to load reports data:', error)
     }
@@ -587,6 +754,63 @@ export default function ReportsPage() {
     },
   ]
 
+  // ========== PRINT HELPERS ==========
+  const toggleSection = (key: SectionKey) => {
+    setSelectedSections(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) {
+        next.delete(key)
+      } else {
+        next.add(key)
+      }
+      return next
+    })
+    setActivePreset('')
+  }
+
+  const toggleAll = (selectAll: boolean) => {
+    if (selectAll) {
+      setSelectedSections(new Set(REPORT_SECTIONS.map(s => s.key)))
+      setActivePreset('Full Report')
+    } else {
+      setSelectedSections(new Set())
+      setActivePreset('')
+    }
+  }
+
+  const applyPreset = (preset: PrintPreset) => {
+    setSelectedSections(new Set(preset.sections))
+    setActivePreset(preset.name)
+  }
+
+  const handlePrint = () => {
+    // Hide sections not selected
+    const allSectionElements = document.querySelectorAll('[data-report-section]')
+    const hiddenElements: HTMLElement[] = []
+    
+    allSectionElements.forEach((el) => {
+      const key = el.getAttribute('data-report-section') as SectionKey
+      if (!selectedSections.has(key)) {
+        const htmlEl = el as HTMLElement
+        htmlEl.style.display = 'none'
+        hiddenElements.push(htmlEl)
+      }
+    })
+
+    // Close the modal before printing
+    setShowPrintModal(false)
+
+    // Small delay to let modal close, then print
+    setTimeout(() => {
+      window.print()
+      
+      // Restore hidden elements after print
+      hiddenElements.forEach(el => {
+        el.style.display = ''
+      })
+    }, 200)
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -596,33 +820,52 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div className="space-y-4 sm:space-y-6 print:space-y-2">
+      {/* Print Header - only shows in print */}
+      <div className="hidden print:block print:mb-4">
+        <h1 className="text-xl font-bold text-gray-900">Sales Report</h1>
+        <p className="text-sm text-gray-500">
+          {timeRange === '7d' ? 'Last 7 Days' : timeRange === '30d' ? 'Last 30 Days' : timeRange === '90d' ? 'Last 90 Days' : 'All Time'}
+          {' • '}Generated {new Date().toLocaleDateString()}
+        </p>
+      </div>
+
+      {/* Header - hidden in print */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 print:hidden">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Reports</h1>
           <p className="text-sm text-gray-500 mt-0.5">Track your sales performance and metrics</p>
         </div>
-        {/* Time Range Selector - Scrollable on mobile */}
-        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 overflow-x-auto scrollbar-hide">
-          {(['7d', '30d', '90d', 'all'] as TimeRange[]).map((range) => (
-            <button
-              key={range}
-              onClick={() => setTimeRange(range)}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
-                timeRange === range
-                  ? 'bg-white shadow-sm text-gray-900'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              {range === '7d' ? '7 Days' : range === '30d' ? '30 Days' : range === '90d' ? '90 Days' : 'All Time'}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          {/* Time Range Selector */}
+          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 overflow-x-auto scrollbar-hide">
+            {(['7d', '30d', '90d', 'all'] as TimeRange[]).map((range) => (
+              <button
+                key={range}
+                onClick={() => setTimeRange(range)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
+                  timeRange === range
+                    ? 'bg-white shadow-sm text-gray-900'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {range === '7d' ? '7 Days' : range === '30d' ? '30 Days' : range === '90d' ? '90 Days' : 'All Time'}
+              </button>
+            ))}
+          </div>
+          {/* Print / Export Button */}
+          <button
+            onClick={() => setShowPrintModal(true)}
+            className="btn btn-secondary gap-2 print:hidden"
+          >
+            <Printer size={16} />
+            <span className="hidden sm:inline">Export</span>
+          </button>
         </div>
       </div>
 
       {/* Stats - Responsive grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div data-report-section="stats" className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {statCards.map((stat) => (
           <div key={stat.label} className="card p-3 sm:p-4">
             <div className="flex items-center justify-between">
@@ -647,7 +890,7 @@ export default function ReportsPage() {
       {/* Pipeline & Deals by Owner - Responsive grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Pipeline Overview */}
-        <div className="card p-4 sm:p-6">
+        <div data-report-section="pipeline" className="card p-4 sm:p-6">
           <h2 className="font-semibold text-gray-900 mb-4">Pipeline Overview</h2>
           {pipelineData.length === 0 ? (
             <p className="text-gray-500 text-sm">No pipeline data available. Create some deals to see stats here.</p>
@@ -680,7 +923,7 @@ export default function ReportsPage() {
         </div>
 
         {/* Deals by Owner */}
-        <div className="card p-4 sm:p-6">
+        <div data-report-section="dealsByOwner" className="card p-4 sm:p-6">
           <h2 className="font-semibold text-gray-900 mb-4">Deals by Owner</h2>
           {dealsByOwner.length === 0 ? (
             <p className="text-gray-500 text-sm">No deals yet. Create deals to see assignment stats.</p>
@@ -718,7 +961,7 @@ export default function ReportsPage() {
       {/* Idle Deals Section - Responsive grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Idle 3-7 Days */}
-        <div className="card p-4 sm:p-6">
+        <div data-report-section="idleDeals3to7" className="card p-4 sm:p-6">
           <div className="flex items-center gap-2 mb-4">
             <AlertTriangle size={18} className="text-yellow-500" />
             <h2 className="font-semibold text-gray-900">Idle Deals (3-7 Days)</h2>
@@ -751,7 +994,7 @@ export default function ReportsPage() {
         </div>
 
         {/* Idle 7+ Days */}
-        <div className="card p-4 sm:p-6">
+        <div data-report-section="idleDeals7plus" className="card p-4 sm:p-6">
           <div className="flex items-center gap-2 mb-4">
             <AlertTriangle size={18} className="text-red-500" />
             <h2 className="font-semibold text-gray-900">Idle Deals (7+ Days)</h2>
@@ -787,7 +1030,7 @@ export default function ReportsPage() {
       {/* Incomplete Tasks Section - Responsive grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Overdue Tasks */}
-        <div className="card p-4 sm:p-6">
+        <div data-report-section="overdueTasks" className="card p-4 sm:p-6">
           <div className="flex items-center gap-2 mb-4">
             <Clock size={18} className="text-red-500" />
             <h2 className="font-semibold text-gray-900">Overdue Tasks</h2>
@@ -823,7 +1066,7 @@ export default function ReportsPage() {
         </div>
 
         {/* All Incomplete Tasks */}
-        <div className="card p-4 sm:p-6">
+        <div data-report-section="incompleteTasks" className="card p-4 sm:p-6">
           <div className="flex items-center gap-2 mb-4">
             <CheckSquare size={18} className="text-yellow-500" />
             <h2 className="font-semibold text-gray-900">Incomplete Tasks</h2>
@@ -864,7 +1107,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Top Deals - Responsive table */}
-      <div className="card">
+      <div data-report-section="topDeals" className="card">
         <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
           <h2 className="font-semibold text-gray-900">Top Open Deals</h2>
         </div>
@@ -974,7 +1217,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Win Rate & Metrics - Responsive grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+      <div data-report-section="winMetrics" className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
         <div className="card p-4 sm:p-6">
           <h3 className="text-sm font-medium text-gray-500 mb-2">Win Rate</h3>
           <div className="flex items-end gap-2">
@@ -1011,7 +1254,7 @@ export default function ReportsPage() {
       </div>
 
       {/* ========== DEALS LOST SECTION ========== */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+      <div data-report-section="dealsLost" className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Loss Reason Breakdown */}
         <div className="card p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">
@@ -1113,7 +1356,7 @@ export default function ReportsPage() {
       </div>
 
       {/* ========== AVG TIME IN STAGE SECTION ========== */}
-      <div className="card p-4 sm:p-6">
+      <div data-report-section="stageTimings" className="card p-4 sm:p-6">
         <div className="flex items-center gap-2 mb-1">
           <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
             <Clock size={16} className="text-indigo-600" />
@@ -1176,6 +1419,346 @@ export default function ReportsPage() {
           </div>
         )}
       </div>
+
+      {/* ========== CONVERSION FUNNEL (Step-Ladder) ========== */}
+      <div data-report-section="funnel" className="card p-4 sm:p-6">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center">
+            <BarChart3 size={16} className="text-teal-600" />
+          </div>
+          <div>
+            <h2 className="font-semibold text-gray-900">Conversion Funnel</h2>
+            <p className="text-xs text-gray-500">Where do deals stop moving?</p>
+          </div>
+        </div>
+        {funnelData.length === 0 ? (
+          <p className="text-gray-500 text-sm mt-4">No pipeline data yet. Add deals to see your conversion funnel.</p>
+        ) : (() => {
+          const totalDeals = funnelData[0]?.count || 0
+          const hasEnoughData = totalDeals >= 10
+          return (
+            <div className="mt-4">
+              {/* Step-ladder funnel visualization */}
+              <div className="space-y-0">
+                {funnelData.map((stage, index) => {
+                  const maxCount = Math.max(...funnelData.map(s => s.count), 1)
+                  const widthPercent = Math.max((stage.count / maxCount) * 100, 15)
+                  const isLastStage = index === funnelData.length - 1
+                  
+                  return (
+                    <div key={stage.stage}>
+                      {/* Stage bar */}
+                      <div 
+                        className="mx-auto transition-all duration-500"
+                        style={{ width: `${widthPercent}%` }}
+                      >
+                        <div 
+                          className="h-10 rounded-md flex items-center justify-between px-3 text-white"
+                          style={{ backgroundColor: stage.color }}
+                        >
+                          <span className="text-sm font-medium truncate">{stage.stage}</span>
+                          <span className="text-sm font-bold">{stage.count}</span>
+                        </div>
+                      </div>
+                      
+                      {/* Arrow connector with conversion rate (only shown with enough data) */}
+                      {!isLastStage && (
+                        <div className="flex flex-col items-center py-1">
+                          <div className="text-gray-400">↓</div>
+                          {hasEnoughData && index < funnelData.length - 1 && funnelData[index + 1] && (
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                              funnelData[index + 1].conversionRate >= 70 ? 'bg-green-100 text-green-700' :
+                              funnelData[index + 1].conversionRate >= 40 ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-red-100 text-red-700'
+                            }`}>
+                              {funnelData[index + 1].conversionRate}%
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Insight or guidance based on data volume */}
+              {!hasEnoughData ? (
+                <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <p className="text-sm text-gray-600">
+                    {funnelData.filter(s => s.count > 0).length > 1 ? (
+                      <>You have deals in <span className="font-medium">{funnelData.filter(s => s.count > 0).length} stages</span>. Conversion rates will appear once you have 10+ deals.</>
+                    ) : (
+                      <>Add more deals to unlock conversion insights.</>  
+                    )}
+                  </p>
+                </div>
+              ) : funnelData.length > 2 && (() => {
+                const stagesWithDrops = funnelData.filter((_, i) => i > 0 && funnelData[i].conversionRate < 100)
+                if (stagesWithDrops.length > 0) {
+                  const weakest = stagesWithDrops.reduce((a, b) => a.conversionRate < b.conversionRate ? a : b)
+                  return (
+                    <div className="mt-4 p-3 bg-teal-50 rounded-lg border border-teal-100">
+                      <p className="text-sm text-teal-800">
+                        <span className="font-medium">💡</span>{' '}
+                        Deals stall most at <span className="font-semibold">{weakest.stage}</span> ({weakest.conversionRate}% make it through). 
+                        Focus here to improve pipeline flow.
+                      </p>
+                    </div>
+                  )
+                }
+                return null
+              })()}
+            </div>
+          )
+        })()}
+      </div>
+
+      {/* ========== SALES VELOCITY + FORECAST ========== */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        {/* Sales Velocity */}
+        <div data-report-section="velocity" className="card p-4 sm:p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+              <TrendingUp size={16} className="text-emerald-600" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-gray-900">Sales Velocity</h2>
+              <p className="text-xs text-gray-500">Is your pipeline producing revenue?</p>
+            </div>
+          </div>
+          
+          {stats.dealsWon === 0 ? (
+            /* Coaching mode - no closed deals yet */
+            <div className="text-center py-6">
+              <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-100 flex items-center justify-center">
+                <TrendingUp size={24} className="text-gray-400" />
+              </div>
+              <p className="text-gray-900 font-medium">Sales velocity can't be calculated yet</p>
+              <p className="text-sm text-gray-500 mt-1">Close at least one deal to unlock this metric.</p>
+              <p className="text-xs text-gray-400 mt-4">
+                Velocity increases when you close deals faster or at higher value.
+              </p>
+            </div>
+          ) : (
+            /* Active mode - has closed deals */
+            <>
+              <div className="text-center py-4">
+                <p className="text-4xl sm:text-5xl font-bold text-gray-900">
+                  ${salesVelocity.toLocaleString()}
+                </p>
+                <p className="text-sm text-gray-500 mt-1">per day</p>
+              </div>
+              
+              {/* Key drivers (no formula shown) */}
+              <div className="mt-4 flex items-center justify-center gap-4 text-sm text-gray-500">
+                <span>{stats.dealsWon} won</span>
+                <span className="text-gray-300">·</span>
+                <span>${avgDealSize.toLocaleString()} avg</span>
+                <span className="text-gray-300">·</span>
+                <span>{avgSalesCycle}d cycle</span>
+              </div>
+              
+              {/* Contextual insight */}
+              <div className="mt-4 p-3 bg-emerald-50 rounded-lg border border-emerald-100">
+                <p className="text-sm text-emerald-800 text-center">
+                  {salesVelocity < 100 ? (
+                    <>Focus on closing deals faster or increasing deal size to boost velocity.</>
+                  ) : salesVelocity < 500 ? (
+                    <>Your pipeline is generating steady revenue. Keep momentum going.</>
+                  ) : (
+                    <>Strong velocity! Your pipeline is producing consistent revenue.</>
+                  )}
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Forecast Pipeline */}
+        <div data-report-section="forecast" className="card p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
+                <DollarSign size={16} className="text-amber-600" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-gray-900">Forecast Pipeline</h2>
+                <p className="text-xs text-gray-500">What's likely to close?</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-2xl font-bold text-gray-900">${totalForecast.toLocaleString()}</p>
+              <p className="text-xs text-gray-500">Expected revenue <span className="text-gray-400">(estimate)</span></p>
+            </div>
+          </div>
+          {forecastData.length === 0 ? (
+            <div className="text-center py-4">
+              <p className="text-gray-500 text-sm">No open deals to forecast.</p>
+              <p className="text-xs text-gray-400 mt-1">Add deals to your pipeline to see revenue projections.</p>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-3">
+                {forecastData.map((stage) => {
+                  const maxValue = Math.max(...forecastData.map(s => s.rawValue), 1)
+                  const rawWidth = (stage.rawValue / maxValue) * 100
+                  const weightedWidth = (stage.weightedValue / maxValue) * 100
+                  return (
+                    <div key={stage.stage}>
+                      <div className="flex items-center justify-between text-sm mb-1">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: stage.color }} />
+                          <span className="text-gray-700 truncate">{stage.stage}</span>
+                          <span className="text-gray-400 text-xs">({stage.count})</span>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                          <span className="font-medium text-gray-900">${stage.weightedValue.toLocaleString()}</span>
+                        </div>
+                      </div>
+                      <div className="h-2 bg-gray-100 rounded-full overflow-hidden relative">
+                        {/* Raw value (light) */}
+                        <div
+                          className="h-full rounded-full absolute top-0 left-0 opacity-25"
+                          style={{ width: `${rawWidth}%`, backgroundColor: stage.color }}
+                        />
+                        {/* Weighted value (solid) */}
+                        <div
+                          className="h-full rounded-full relative transition-all duration-500"
+                          style={{ width: `${weightedWidth}%`, backgroundColor: stage.color }}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              
+              {/* Estimated weights disclaimer */}
+              <p className="text-xs text-gray-400 mt-3 text-center">
+                Based on estimated stage probabilities. Upgrade to customize weights.
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ========== PRINT/EXPORT MODAL ========== */}
+      {showPrintModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 print:hidden">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowPrintModal(false)}
+          />
+          
+          {/* Modal */}
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Export Report</h2>
+                <p className="text-sm text-gray-500">Choose which sections to include</p>
+              </div>
+              <button 
+                onClick={() => setShowPrintModal(false)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-100 transition-colors"
+              >
+                <X size={18} className="text-gray-500" />
+              </button>
+            </div>
+
+            {/* Presets */}
+            <div className="px-6 py-3 border-b border-gray-100">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Quick Presets</p>
+              <div className="grid grid-cols-3 gap-2">
+                {PRINT_PRESETS.map((preset) => (
+                  <button
+                    key={preset.name}
+                    onClick={() => applyPreset(preset)}
+                    className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border text-center transition-all ${
+                      activePreset === preset.name
+                        ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-500'
+                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <preset.icon size={18} className={activePreset === preset.name ? 'text-primary-600' : 'text-gray-500'} />
+                    <span className={`text-xs font-medium ${activePreset === preset.name ? 'text-primary-700' : 'text-gray-700'}`}>
+                      {preset.name}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Section Checkboxes */}
+            <div className="flex-1 overflow-y-auto px-6 py-3">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Sections</p>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => toggleAll(true)}
+                    className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                  >
+                    Select all
+                  </button>
+                  <span className="text-gray-300">|</span>
+                  <button 
+                    onClick={() => toggleAll(false)}
+                    className="text-xs text-gray-500 hover:text-gray-700 font-medium"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-1">
+                {REPORT_SECTIONS.map((section) => (
+                  <label 
+                    key={section.key}
+                    className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-colors ${
+                      selectedSections.has(section.key) ? 'bg-gray-50' : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedSections.has(section.key)}
+                      onChange={() => toggleSection(section.key)}
+                      className="w-4 h-4 rounded border-gray-300 text-primary-500 focus:ring-primary-500 cursor-pointer"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-medium ${selectedSections.has(section.key) ? 'text-gray-900' : 'text-gray-500'}`}>
+                        {section.label}
+                      </p>
+                      <p className="text-xs text-gray-400">{section.description}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+              <p className="text-sm text-gray-500">
+                {selectedSections.size} of {REPORT_SECTIONS.length} sections
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowPrintModal(false)}
+                  className="btn btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handlePrint}
+                  disabled={selectedSections.size === 0}
+                  className="btn btn-primary gap-2 disabled:opacity-50"
+                >
+                  <Printer size={16} />
+                  Print / Save PDF
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

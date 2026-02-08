@@ -22,18 +22,22 @@ export default function DashboardShell({ user, children }: DashboardShellProps) 
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
-    <div className="h-screen flex bg-gray-50">
-      <Sidebar 
-        user={user} 
-        isOpen={sidebarOpen} 
-        onClose={() => setSidebarOpen(false)} 
-      />
-      <div className="flex-1 flex flex-col min-w-0">
-        <Header 
+    <div className="h-screen flex bg-gray-50 print:h-auto print:bg-white print:block">
+      <div className="print:hidden">
+        <Sidebar 
           user={user} 
-          onMenuClick={() => setSidebarOpen(true)} 
+          isOpen={sidebarOpen} 
+          onClose={() => setSidebarOpen(false)} 
         />
-        <main className="flex-1 overflow-auto p-3 sm:p-4 md:p-6">
+      </div>
+      <div className="flex-1 flex flex-col min-w-0 print:block">
+        <div className="print:hidden">
+          <Header 
+            user={user} 
+            onMenuClick={() => setSidebarOpen(true)} 
+          />
+        </div>
+        <main className="flex-1 overflow-auto p-3 sm:p-4 md:p-6 print:p-0 print:overflow-visible">
           {children}
         </main>
       </div>
