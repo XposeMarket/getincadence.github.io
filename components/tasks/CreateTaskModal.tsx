@@ -22,6 +22,11 @@ interface Deal {
   name: string
 }
 
+interface TeamMember {
+  id: string
+  full_name: string
+}
+
 interface CreateTaskModalProps {
   onClose: () => void
   onCreated: () => void
@@ -49,6 +54,8 @@ export default function CreateTaskModal({
   const [contacts, setContacts] = useState<Contact[]>([])
   const [companies, setCompanies] = useState<Company[]>([])
   const [deals, setDeals] = useState<Deal[]>([])
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+  const [assignedTo, setAssignedTo] = useState('')
   const [orgId, setOrgId] = useState<string | null>(null)
   const supabase = createClient()
 
@@ -64,7 +71,7 @@ export default function CreateTaskModal({
   }, [])
 
   const loadRelatedData = async (currentOrgId: string) => {
-    const [contactsRes, companiesRes, dealsRes] = await Promise.all([
+    const [contactsRes, companiesRes, dealsRes, teamRes] = await Promise.all([
       supabase
         .from('contacts')
         .select('id, first_name, last_name')
@@ -79,12 +86,18 @@ export default function CreateTaskModal({
         .from('deals')
         .select('id, name')
         .eq('org_id', currentOrgId)
-        .order('name', { ascending: true })
+        .order('name', { ascending: true }),
+      supabase
+        .from('users')
+        .select('id, full_name')
+        .eq('org_id', currentOrgId)
+        .order('full_name', { ascending: true })
     ])
 
     if (contactsRes.data) setContacts(contactsRes.data)
     if (companiesRes.data) setCompanies(companiesRes.data)
     if (dealsRes.data) setDeals(dealsRes.data)
+    if (teamRes.data) setTeamMembers(teamRes.data)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -108,6 +121,7 @@ export default function CreateTaskModal({
         contact_id: contactId || null,
         company_id: companyId || null,
         deal_id: dealId || null,
+        assigned_to: assignedTo || null,
         status: 'open',
         org_id: orgId,
       })
@@ -208,6 +222,27 @@ export default function CreateTaskModal({
               />
             </div>
           </div>
+
+          {/* Only show assign field if there's more than one team member */}
+          {teamMembers.length > 1 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Assign To
+              </label>
+              <select
+                value={assignedTo}
+                onChange={(e) => setAssignedTo(e.target.value)}
+                className="input"
+              >
+                <option value="">Unassigned</option>
+                {teamMembers.map(member => (
+                  <option key={member.id} value={member.id}>
+                    {member.full_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
