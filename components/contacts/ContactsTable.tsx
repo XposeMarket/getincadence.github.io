@@ -11,13 +11,19 @@ interface Contact {
   email: string | null
   phone: string | null
   title: string | null
-  companies: { id: string; name: string } | null
-  owner: { id: string; full_name: string } | null
+  companies: { id: string; name: string }[] | { id: string; name: string } | null
+  owner: { id: string; full_name: string }[] | { id: string; full_name: string } | null
   created_at: string
 }
 
 interface ContactsTableProps {
   contacts: Contact[]
+}
+
+// Helper to get first item from Supabase join that could be array or object
+const getFirst = <T,>(data: T[] | T | null | undefined): T | null => {
+  if (!data) return null
+  return Array.isArray(data) ? data[0] || null : data
 }
 
 export default function ContactsTable({ contacts }: ContactsTableProps) {
@@ -140,24 +146,30 @@ export default function ContactsTable({ contacts }: ContactsTableProps) {
                   )}
                 </td>
                 <td className="px-4 py-3">
-                  {contact.companies ? (
-                    <Link 
-                      href={`/companies/${contact.companies.id}`}
-                      className="text-sm text-gray-600 hover:text-primary-600 transition-colors flex items-center gap-1.5"
-                    >
-                      <Building2 size={14} />
-                      {contact.companies.name}
-                    </Link>
-                  ) : (
-                    <span className="text-sm text-gray-400">—</span>
-                  )}
+                  {(() => {
+                    const company = getFirst(contact.companies)
+                    return company ? (
+                      <Link 
+                        href={`/companies/${company.id}`}
+                        className="text-sm text-gray-600 hover:text-primary-600 transition-colors flex items-center gap-1.5"
+                      >
+                        <Building2 size={14} />
+                        {company.name}
+                      </Link>
+                    ) : (
+                      <span className="text-sm text-gray-400">—</span>
+                    )
+                  })()}
                 </td>
                 <td className="px-4 py-3">
-                  {contact.owner ? (
-                    <span className="text-sm text-gray-600">{contact.owner.full_name}</span>
-                  ) : (
-                    <span className="text-sm text-gray-400">Unassigned</span>
-                  )}
+                  {(() => {
+                    const owner = getFirst(contact.owner)
+                    return owner ? (
+                      <span className="text-sm text-gray-600">{owner.full_name}</span>
+                    ) : (
+                      <span className="text-sm text-gray-400">Unassigned</span>
+                    )
+                  })()}
                 </td>
                 <td className="px-4 py-3">
                   <button className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg opacity-0 group-hover:opacity-100 transition-all">

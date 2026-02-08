@@ -24,9 +24,9 @@ interface Deal {
   created_at: string
   updated_at: string
   close_date: string | null
-  pipeline_stages?: { name: string; color: string; is_won?: boolean; is_lost?: boolean }
-  contacts?: { first_name: string; last_name: string }
-  companies?: { name: string }
+  pipeline_stages?: { name: string; color: string; is_won?: boolean; is_lost?: boolean }[] | { name: string; color: string; is_won?: boolean; is_lost?: boolean }
+  contacts?: { first_name: string; last_name: string }[] | { first_name: string; last_name: string }
+  companies?: { name: string }[] | { name: string }
 }
 
 interface Task {
@@ -37,8 +37,8 @@ interface Task {
   due_date: string | null
   created_at: string
   assigned_to: string | null
-  deals?: { id: string; name: string }
-  contacts?: { first_name: string; last_name: string }
+  deals?: { id: string; name: string }[] | { id: string; name: string }
+  contacts?: { first_name: string; last_name: string }[] | { first_name: string; last_name: string }
 }
 
 interface PipelineStage {
@@ -64,6 +64,12 @@ interface Activity {
   id: string
   deal_id: string | null
   created_at: string
+}
+
+// Helper to get first item from Supabase join that could be array or object
+const getFirst = <T,>(data: T[] | T | null | undefined): T | null => {
+  if (!data) return null
+  return Array.isArray(data) ? data[0] || null : data
 }
 
 export default function ReportsPage() {
@@ -263,7 +269,10 @@ export default function ReportsPage() {
       users.forEach(u => userMap.set(u.id, u.full_name))
 
       // Calculate stats - deals with is_won stage
-      const wonDeals = deals.filter(d => d.pipeline_stages?.is_won)
+      const wonDeals = deals.filter(d => {
+        const stage = getFirst(d.pipeline_stages)
+        return stage?.is_won
+      })
       const currentPeriodWonDeals = wonDeals.filter(d => new Date(d.updated_at) >= startDate)
       const prevPeriodWonDeals = wonDeals.filter(d => {
         const date = new Date(d.updated_at)
@@ -298,7 +307,10 @@ export default function ReportsPage() {
 
       // Top deals (by value, excluding closed)
       const openDeals = deals
-        .filter(d => !d.pipeline_stages?.is_won && !d.pipeline_stages?.is_lost)
+        .filter(d => {
+          const stage = getFirst(d.pipeline_stages)
+          return !stage?.is_won && !stage?.is_lost
+        })
         .map(d => ({
           ...d,
           ownerName: d.owner_id ? userMap.get(d.owner_id) : undefined
@@ -343,7 +355,10 @@ export default function ReportsPage() {
       const threeDaysAgo = subDays(now, 3)
       const sevenDaysAgo = subDays(now, 7)
 
-      const openDealsForIdle = deals.filter(d => !d.pipeline_stages?.is_won && !d.pipeline_stages?.is_lost)
+      const openDealsForIdle = deals.filter(d => {
+        const stage = getFirst(d.pipeline_stages)
+        return !stage?.is_won && !stage?.is_lost
+      })
       
       const idle3to7 = openDealsForIdle.filter(deal => {
         const lastActivity = dealLastActivity.get(deal.id)
@@ -370,13 +385,22 @@ export default function ReportsPage() {
       setOverdueTasks(overdue)
 
       // Win rate calculation
-      const closedDeals = deals.filter(d => d.pipeline_stages?.is_won || d.pipeline_stages?.is_lost)
-      const wonDealsCount = deals.filter(d => d.pipeline_stages?.is_won).length
+      const closedDeals = deals.filter(d => {
+        const stage = getFirst(d.pipeline_stages)
+        return stage?.is_won || stage?.is_lost
+      })
+      const wonDealsCount = deals.filter(d => {
+        const stage = getFirst(d.pipeline_stages)
+        return stage?.is_won
+      }).length
       const winRateCalc = closedDeals.length > 0 ? (wonDealsCount / closedDeals.length) * 100 : 0
       setWinRate(Math.round(winRateCalc))
 
       // Average deal size
-      const wonDealsForAvg = deals.filter(d => d.pipeline_stages?.is_won)
+      const wonDealsForAvg = deals.filter(d => {
+        const stage = getFirst(d.pipeline_stages)
+        return stage?.is_won
+      })
       const avgSize = wonDealsForAvg.length > 0
         ? wonDealsForAvg.reduce((sum, d) => sum + (d.amount || 0), 0) / wonDealsForAvg.length
         : 0
@@ -416,29 +440,29 @@ export default function ReportsPage() {
   const statCards = [
     { 
       label: 'Total Revenue', 
-      value: `$${stats.totalRevenue.toLocaleString()}`, 
       ...calculateChange(stats.totalRevenue, stats.prevRevenue),
+      value: `$${stats.totalRevenue.toLocaleString()}`, 
       icon: DollarSign,
       color: 'bg-green-100 text-green-600'
     },
     { 
       label: 'New Contacts', 
-      value: stats.newContacts.toString(), 
       ...calculateChange(stats.newContacts, stats.prevContacts),
+      value: stats.newContacts.toString(),
       icon: Users,
       color: 'bg-blue-100 text-blue-600'
     },
     { 
       label: 'Deals Won', 
-      value: stats.dealsWon.toString(), 
       ...calculateChange(stats.dealsWon, stats.prevDealsWon),
+      value: stats.dealsWon.toString(), 
       icon: Handshake,
       color: 'bg-pink-100 text-pink-600'
     },
     { 
       label: 'Tasks Completed', 
-      value: stats.tasksCompleted.toString(), 
       ...calculateChange(stats.tasksCompleted, stats.prevTasksCompleted),
+      value: stats.tasksCompleted.toString(), 
       icon: CheckSquare,
       color: 'bg-yellow-100 text-yellow-600'
     },
@@ -585,21 +609,24 @@ export default function ReportsPage() {
             <p className="text-gray-500 text-sm">No idle deals in this range 🎉</p>
           ) : (
             <div className="space-y-2 max-h-64 overflow-y-auto">
-              {idleDeals3to7.map(deal => (
-                <Link 
-                  key={deal.id} 
-                  href={`/deals/${deal.id}`}
-                  className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition-colors"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-gray-900 truncate">{deal.name}</p>
-                    <p className="text-sm text-gray-500 truncate">
-                      {deal.pipeline_stages?.name} • ${(deal.amount || 0).toLocaleString()}
-                    </p>
-                  </div>
-                  <ExternalLink size={16} className="text-gray-400 flex-shrink-0 ml-2" />
-                </Link>
-              ))}
+              {idleDeals3to7.map(deal => {
+                const stage = getFirst(deal.pipeline_stages)
+                return (
+                  <Link 
+                    key={deal.id} 
+                    href={`/deals/${deal.id}`}
+                    className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition-colors"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-gray-900 truncate">{deal.name}</p>
+                      <p className="text-sm text-gray-500 truncate">
+                        {stage?.name} • ${(deal.amount || 0).toLocaleString()}
+                      </p>
+                    </div>
+                    <ExternalLink size={16} className="text-gray-400 flex-shrink-0 ml-2" />
+                  </Link>
+                )
+              })}
             </div>
           )}
         </div>
@@ -615,21 +642,24 @@ export default function ReportsPage() {
             <p className="text-gray-500 text-sm">No idle deals in this range 🎉</p>
           ) : (
             <div className="space-y-2 max-h-64 overflow-y-auto">
-              {idleDeals7Plus.map(deal => (
-                <Link 
-                  key={deal.id} 
-                  href={`/deals/${deal.id}`}
-                  className="flex items-center justify-between p-3 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-gray-900 truncate">{deal.name}</p>
-                    <p className="text-sm text-gray-500 truncate">
-                      {deal.pipeline_stages?.name} • ${(deal.amount || 0).toLocaleString()}
-                    </p>
-                  </div>
-                  <ExternalLink size={16} className="text-gray-400 flex-shrink-0 ml-2" />
-                </Link>
-              ))}
+              {idleDeals7Plus.map(deal => {
+                const stage = getFirst(deal.pipeline_stages)
+                return (
+                  <Link 
+                    key={deal.id} 
+                    href={`/deals/${deal.id}`}
+                    className="flex items-center justify-between p-3 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-gray-900 truncate">{deal.name}</p>
+                      <p className="text-sm text-gray-500 truncate">
+                        {stage?.name} • ${(deal.amount || 0).toLocaleString()}
+                      </p>
+                    </div>
+                    <ExternalLink size={16} className="text-gray-400 flex-shrink-0 ml-2" />
+                  </Link>
+                )
+              })}
             </div>
           )}
         </div>
@@ -684,28 +714,31 @@ export default function ReportsPage() {
             <p className="text-gray-500 text-sm">All tasks completed 🎉</p>
           ) : (
             <div className="space-y-2 max-h-64 overflow-y-auto">
-              {incompleteTasks.map(task => (
-                <Link 
-                  key={task.id} 
-                  href="/tasks"
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-gray-900 truncate">{task.title}</p>
-                    <p className="text-sm text-gray-500 truncate">
-                      {task.due_date ? `Due ${format(new Date(task.due_date), 'MMM d')}` : 'No due date'}
-                      {task.deals && ` • ${task.deals.name}`}
-                    </p>
-                  </div>
-                  <span className={`badge flex-shrink-0 ml-2 ${
-                    task.priority === 'high' ? 'bg-red-100 text-red-700' :
-                    task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                    'bg-gray-100 text-gray-700'
-                  }`}>
-                    {task.priority}
-                  </span>
-                </Link>
-              ))}
+              {incompleteTasks.map(task => {
+                const taskDeal = getFirst(task.deals)
+                return (
+                  <Link 
+                    key={task.id} 
+                    href="/tasks"
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-gray-900 truncate">{task.title}</p>
+                      <p className="text-sm text-gray-500 truncate">
+                        {task.due_date ? `Due ${format(new Date(task.due_date), 'MMM d')}` : 'No due date'}
+                        {taskDeal && ` • ${taskDeal.name}`}
+                      </p>
+                    </div>
+                    <span className={`badge flex-shrink-0 ml-2 ${
+                      task.priority === 'high' ? 'bg-red-100 text-red-700' :
+                      task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                      'bg-gray-100 text-gray-700'
+                    }`}>
+                      {task.priority}
+                    </span>
+                  </Link>
+                )
+              })}
             </div>
           )}
         </div>
@@ -724,39 +757,44 @@ export default function ReportsPage() {
           <>
             {/* Mobile: Card layout */}
             <div className="sm:hidden divide-y divide-gray-200">
-              {topDeals.map((deal) => (
-                <Link 
-                  key={deal.id} 
-                  href={`/deals/${deal.id}`}
-                  className="block p-4 hover:bg-gray-50"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-primary-600">{deal.name}</p>
-                      <p className="text-sm text-gray-500 mt-1">
-                        {deal.contacts ? `${deal.contacts.first_name} ${deal.contacts.last_name}` : ''}
-                        {deal.contacts && deal.companies ? ' • ' : ''}
-                        {deal.companies?.name || ''}
-                      </p>
-                      <div className="flex items-center gap-2 mt-2 flex-wrap">
-                        <span 
-                          className="badge text-xs"
-                          style={{ 
-                            backgroundColor: `${deal.pipeline_stages?.color}20`,
-                            color: deal.pipeline_stages?.color
-                          }}
-                        >
-                          {deal.pipeline_stages?.name || 'Unknown'}
-                        </span>
-                        {deal.ownerName && (
-                          <span className="text-xs text-gray-500">{deal.ownerName}</span>
-                        )}
+              {topDeals.map((deal) => {
+                const dealContact = getFirst(deal.contacts)
+                const dealCompany = getFirst(deal.companies)
+                const stage = getFirst(deal.pipeline_stages)
+                return (
+                  <Link 
+                    key={deal.id} 
+                    href={`/deals/${deal.id}`}
+                    className="block p-4 hover:bg-gray-50"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-primary-600">{deal.name}</p>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {dealContact ? `${dealContact.first_name} ${dealContact.last_name}` : ''}
+                          {dealContact && dealCompany ? ' • ' : ''}
+                          {dealCompany?.name || ''}
+                        </p>
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          <span 
+                            className="badge text-xs"
+                            style={{ 
+                              backgroundColor: `${stage?.color}20`,
+                              color: stage?.color
+                            }}
+                          >
+                            {stage?.name || 'Unknown'}
+                          </span>
+                          {deal.ownerName && (
+                            <span className="text-xs text-gray-500">{deal.ownerName}</span>
+                          )}
+                        </div>
                       </div>
+                      <p className="font-semibold text-gray-900">${(deal.amount || 0).toLocaleString()}</p>
                     </div>
-                    <p className="font-semibold text-gray-900">${(deal.amount || 0).toLocaleString()}</p>
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                )
+              })}
             </div>
             
             {/* Desktop: Table layout */}
@@ -772,38 +810,43 @@ export default function ReportsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {topDeals.map((deal) => (
-                    <tr key={deal.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4">
-                        <Link href={`/deals/${deal.id}`} className="font-medium text-primary-600 hover:underline">
-                          {deal.name}
-                        </Link>
-                      </td>
-                      <td className="px-6 py-4 text-gray-600">
-                        {deal.contacts ? `${deal.contacts.first_name} ${deal.contacts.last_name}` : ''}
-                        {deal.contacts && deal.companies ? ' • ' : ''}
-                        {deal.companies?.name || ''}
-                        {!deal.contacts && !deal.companies && <span className="text-gray-400">—</span>}
-                      </td>
-                      <td className="px-6 py-4 font-medium text-gray-900">
-                        ${(deal.amount || 0).toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span 
-                          className="badge"
-                          style={{ 
-                            backgroundColor: `${deal.pipeline_stages?.color}20`,
-                            color: deal.pipeline_stages?.color
-                          }}
-                        >
-                          {deal.pipeline_stages?.name || 'Unknown'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-gray-600">
-                        {deal.ownerName || <span className="text-gray-400">Unassigned</span>}
-                      </td>
-                    </tr>
-                  ))}
+                  {topDeals.map((deal) => {
+                    const dealContact = getFirst(deal.contacts)
+                    const dealCompany = getFirst(deal.companies)
+                    const stage = getFirst(deal.pipeline_stages)
+                    return (
+                      <tr key={deal.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4">
+                          <Link href={`/deals/${deal.id}`} className="font-medium text-primary-600 hover:underline">
+                            {deal.name}
+                          </Link>
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {dealContact ? `${dealContact.first_name} ${dealContact.last_name}` : ''}
+                          {dealContact && dealCompany ? ' • ' : ''}
+                          {dealCompany?.name || ''}
+                          {!dealContact && !dealCompany && <span className="text-gray-400">—</span>}
+                        </td>
+                        <td className="px-6 py-4 font-medium text-gray-900">
+                          ${(deal.amount || 0).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span 
+                            className="badge"
+                            style={{ 
+                              backgroundColor: `${stage?.color}20`,
+                              color: stage?.color
+                            }}
+                          >
+                            {stage?.name || 'Unknown'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {deal.ownerName || <span className="text-gray-400">Unassigned</span>}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

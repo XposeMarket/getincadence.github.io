@@ -25,15 +25,21 @@ interface Task {
   deal_id: string | null
   assigned_to: string | null
   created_at: string
-  contacts: { id: string; first_name: string; last_name: string } | null
-  companies: { id: string; name: string } | null
-  deals: { id: string; name: string } | null
-  assigned_user: { id: string; full_name: string } | null
+  contacts: { id: string; first_name: string; last_name: string }[] | { id: string; first_name: string; last_name: string } | null
+  companies: { id: string; name: string }[] | { id: string; name: string } | null
+  deals: { id: string; name: string }[] | { id: string; name: string } | null
+  assigned_user: { id: string; full_name: string }[] | { id: string; full_name: string } | null
 }
 
 interface TasksListProps {
   tasks: Task[]
-  onStatusChange: (taskId: string, newStatus: string) => void
+  onStatusChange: (taskId: string, newStatus: Task['status']) => void
+}
+
+// Helper to get first item from Supabase join that could be array or object
+const getFirst = <T,>(data: T[] | T | null | undefined): T | null => {
+  if (!data) return null
+  return Array.isArray(data) ? data[0] || null : data
 }
 
 export default function TasksList({ tasks, onStatusChange }: TasksListProps) {
@@ -61,7 +67,7 @@ export default function TasksList({ tasks, onStatusChange }: TasksListProps) {
     }
   }
 
-  const getNextStatus = (status: string): string => {
+  const getNextStatus = (status: string): Task['status'] => {
     switch (status) {
       case 'pending':
       case 'open':
@@ -160,44 +166,56 @@ export default function TasksList({ tasks, onStatusChange }: TasksListProps) {
                     </div>
                   )}
 
-                  {task.contacts && (
-                    <Link
-                      href={`/contacts/${task.contacts.id}`}
-                      className="flex items-center gap-1 hover:text-primary-600"
-                    >
-                      <User size={12} />
-                      {task.contacts.first_name} {task.contacts.last_name}
-                    </Link>
-                  )}
+                  {(() => {
+                    const taskContact = getFirst(task.contacts)
+                    return taskContact && (
+                      <Link
+                        href={`/contacts/${taskContact.id}`}
+                        className="flex items-center gap-1 hover:text-primary-600"
+                      >
+                        <User size={12} />
+                        {taskContact.first_name} {taskContact.last_name}
+                      </Link>
+                    )
+                  })()}
 
-                  {task.companies && (
-                    <Link
-                      href={`/companies/${task.companies.id}`}
-                      className="flex items-center gap-1 hover:text-primary-600"
-                    >
-                      <Building2 size={12} />
-                      {task.companies.name}
-                    </Link>
-                  )}
+                  {(() => {
+                    const taskCompany = getFirst(task.companies)
+                    return taskCompany && (
+                      <Link
+                        href={`/companies/${taskCompany.id}`}
+                        className="flex items-center gap-1 hover:text-primary-600"
+                      >
+                        <Building2 size={12} />
+                        {taskCompany.name}
+                      </Link>
+                    )
+                  })()}
 
-                  {task.deals && (
-                    <Link
-                      href={`/deals/${task.deals.id}`}
-                      className="flex items-center gap-1 hover:text-primary-600"
-                    >
-                      <Handshake size={12} />
-                      {task.deals.name}
-                    </Link>
-                  )}
+                  {(() => {
+                    const taskDeal = getFirst(task.deals)
+                    return taskDeal && (
+                      <Link
+                        href={`/deals/${taskDeal.id}`}
+                        className="flex items-center gap-1 hover:text-primary-600"
+                      >
+                        <Handshake size={12} />
+                        {taskDeal.name}
+                      </Link>
+                    )
+                  })()}
 
-                  {task.assigned_user && (
-                    <div className="flex items-center gap-1">
-                      <div className="w-4 h-4 rounded-full bg-gradient-to-br from-cadence-pink to-cadence-teal flex items-center justify-center text-white text-[8px] font-medium">
-                        {task.assigned_user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                  {(() => {
+                    const assignedUser = getFirst(task.assigned_user)
+                    return assignedUser && (
+                      <div className="flex items-center gap-1">
+                        <div className="w-4 h-4 rounded-full bg-gradient-to-br from-cadence-pink to-cadence-teal flex items-center justify-center text-white text-[8px] font-medium">
+                          {assignedUser.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                        </div>
+                        {assignedUser.full_name}
                       </div>
-                      {task.assigned_user.full_name}
-                    </div>
-                  )}
+                    )
+                  })()}
                 </div>
               </div>
             </div>

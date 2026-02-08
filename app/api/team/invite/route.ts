@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     const currentPlan = (subscription?.plan || 'solo') as PlanType
-    const additionalSeats = subscription?.extra_seats || 0
+    const additionalSeats = subscription?.additional_seats || 0
 
     // Count current users in the organization
     const { count: currentUserCount, error: countError } = await supabase

@@ -30,8 +30,8 @@ interface Deal {
   owner_id: string | null
   close_date: string | null
   created_at: string
-  contacts: { id: string; first_name: string; last_name: string } | null
-  companies: { id: string; name: string } | null
+  contacts: { id: string; first_name: string; last_name: string }[] | { id: string; first_name: string; last_name: string } | null
+  companies: { id: string; name: string }[] | { id: string; name: string } | null
 }
 
 interface Pipeline {
@@ -43,6 +43,12 @@ interface Pipeline {
 interface AutomationToast {
   message: string
   visible: boolean
+}
+
+// Helper to get first item from Supabase join that could be array or object
+const getFirst = <T,>(data: T[] | T | null | undefined): T | null => {
+  if (!data) return null
+  return Array.isArray(data) ? data[0] || null : data
 }
 
 export default function DealsPage() {
@@ -198,7 +204,7 @@ export default function DealsPage() {
       setStages(stagesRes.data)
     }
 
-    if (dealsRes.data) setDeals(dealsRes.data)
+    if (dealsRes.data) setDeals(dealsRes.data as Deal[])
   }
 
   const handleDealMove = async (dealId: string, newStageId: string) => {
@@ -240,6 +246,9 @@ export default function DealsPage() {
       return
     }
 
+    const dealContact = getFirst(deal.contacts)
+    const dealCompany = getFirst(deal.companies)
+
     const automationResult = await onDealStageChanged({
       dealId: deal.id,
       dealName: deal.name,
@@ -247,9 +256,9 @@ export default function DealsPage() {
       oldStageName: oldStage.name,
       newStageName: newStage.name,
       contactId: deal.contact_id || undefined,
-      contactName: deal.contacts ? `${deal.contacts.first_name} ${deal.contacts.last_name}` : undefined,
+      contactName: dealContact ? `${dealContact.first_name} ${dealContact.last_name}` : undefined,
       companyId: deal.company_id || undefined,
-      companyName: deal.companies?.name
+      companyName: dealCompany?.name
     })
 
     if (automationResult.isWon) {
@@ -273,11 +282,13 @@ export default function DealsPage() {
   const filteredDeals = deals.filter(deal => {
     if (!searchQuery) return true
     const search = searchQuery.toLowerCase()
+    const dealContact = getFirst(deal.contacts)
+    const dealCompany = getFirst(deal.companies)
     return (
       deal.name.toLowerCase().includes(search) ||
-      deal.contacts?.first_name?.toLowerCase().includes(search) ||
-      deal.contacts?.last_name?.toLowerCase().includes(search) ||
-      deal.companies?.name?.toLowerCase().includes(search)
+      dealContact?.first_name?.toLowerCase().includes(search) ||
+      dealContact?.last_name?.toLowerCase().includes(search) ||
+      dealCompany?.name?.toLowerCase().includes(search)
     )
   })
 

@@ -16,9 +16,9 @@ interface Deal {
   amount: number | null
   close_date: string
   stage_id: string
-  contacts: { id: string; first_name: string; last_name: string } | null
-  companies: { id: string; name: string } | null
-  pipeline_stages: { id: string; name: string; color: string } | null
+  contacts: { id: string; first_name: string; last_name: string }[] | { id: string; first_name: string; last_name: string } | null
+  companies: { id: string; name: string }[] | { id: string; name: string } | null
+  pipeline_stages: { id: string; name: string; color: string }[] | { id: string; name: string; color: string } | null
 }
 
 interface Task {
@@ -27,9 +27,9 @@ interface Task {
   due_date: string
   priority: string
   status: string
-  contacts: { id: string; first_name: string; last_name: string } | null
-  companies: { id: string; name: string } | null
-  deals: { id: string; name: string } | null
+  contacts: { id: string; first_name: string; last_name: string }[] | { id: string; first_name: string; last_name: string } | null
+  companies: { id: string; name: string }[] | { id: string; name: string } | null
+  deals: { id: string; name: string }[] | { id: string; name: string } | null
 }
 
 interface AttentionLevel {
@@ -38,6 +38,12 @@ interface AttentionLevel {
   items: (Deal | Task)[]
   color: string
   bgColor: string
+}
+
+// Helper to get first item from Supabase join that could be array or object
+const getFirst = <T,>(data: T[] | T | null | undefined): T | null => {
+  if (!data) return null
+  return Array.isArray(data) ? data[0] || null : data
 }
 
 export default function PlannerPage() {
@@ -89,8 +95,8 @@ export default function PlannerPage() {
         .order('due_date', { ascending: true })
     ])
 
-    if (dealsRes.data) setDeals(dealsRes.data)
-    if (tasksRes.data) setTasks(tasksRes.data)
+    if (dealsRes.data) setDeals(dealsRes.data as Deal[])
+    if (tasksRes.data) setTasks(tasksRes.data as Task[])
     setLoading(false)
   }
 
@@ -233,6 +239,8 @@ function TaskItemRow({ task }: { task: Task }) {
   }
 
   const colors = priorityColors[task.priority] || priorityColors.normal
+  const taskDeal = getFirst(task.deals)
+  const taskContact = getFirst(task.contacts)
 
   return (
     <Link href="/tasks">
@@ -244,16 +252,16 @@ function TaskItemRow({ task }: { task: Task }) {
             <span className={`text-xs px-2 py-0.5 rounded font-medium ${colors.bg} ${colors.text}`}>
               {task.priority}
             </span>
-            {task.deals && (
+            {taskDeal && (
               <div className="flex items-center gap-1 text-xs text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
                 <Handshake size={12} />
-                <span>{task.deals.name}</span>
+                <span>{taskDeal.name}</span>
               </div>
             )}
-            {task.contacts && (
+            {taskContact && (
               <div className="flex items-center gap-1 text-xs text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
                 <User size={12} />
-                <span>{task.contacts.first_name}</span>
+                <span>{taskContact.first_name}</span>
               </div>
             )}
           </div>
@@ -267,7 +275,9 @@ function TaskItemRow({ task }: { task: Task }) {
 }
 
 function DealItemRow({ deal }: { deal: Deal }) {
-  const stageColor = deal.pipeline_stages?.color || '#6B7280'
+  const stage = getFirst(deal.pipeline_stages)
+  const dealCompany = getFirst(deal.companies)
+  const stageColor = stage?.color || '#6B7280'
   const amount = deal.amount || 0
 
   return (
@@ -281,7 +291,7 @@ function DealItemRow({ deal }: { deal: Deal }) {
           <h3 className="text-sm font-medium text-gray-900">{deal.name}</h3>
           <div className="flex items-center gap-2 mt-1 flex-wrap text-xs">
             <span className="text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
-              {deal.pipeline_stages?.name || 'No stage'}
+              {stage?.name || 'No stage'}
             </span>
             {amount > 0 && (
               <div className="flex items-center gap-1 text-green-600 bg-green-100 px-2 py-0.5 rounded">
@@ -289,10 +299,10 @@ function DealItemRow({ deal }: { deal: Deal }) {
                 <span>{amount.toLocaleString()}</span>
               </div>
             )}
-            {deal.companies && (
+            {dealCompany && (
               <div className="flex items-center gap-1 text-gray-600 bg-gray-100 px-2 py-0.5 rounded truncate">
                 <Building2 size={12} />
-                <span className="truncate">{deal.companies.name}</span>
+                <span className="truncate">{dealCompany.name}</span>
               </div>
             )}
           </div>

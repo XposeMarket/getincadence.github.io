@@ -61,7 +61,13 @@ interface Activity {
   type: string
   content: string
   created_at: string
-  users: { full_name: string } | null
+  users: { full_name: string }[] | { full_name: string } | null
+}
+
+// Helper to get first item from Supabase join that could be array or object
+const getFirst = <T,>(data: T[] | T | null): T | null => {
+  if (!data) return null
+  return Array.isArray(data) ? data[0] || null : data
 }
 
 export default function ContactDetailPage({ params }: { params: { id: string } }) {
@@ -120,9 +126,9 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
     ])
 
     if (contactRes.data) setContact(contactRes.data)
-    if (dealsRes.data) setDeals(dealsRes.data)
-    if (tasksRes.data) setTasks(tasksRes.data)
-    if (activitiesRes.data) setActivities(activitiesRes.data)
+    if (dealsRes.data) setDeals(dealsRes.data as Deal[])
+    if (tasksRes.data) setTasks(tasksRes.data as Task[])
+    if (activitiesRes.data) setActivities(activitiesRes.data as Activity[])
     setLoading(false)
   }
 
@@ -321,32 +327,35 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
             </div>
             {deals.length > 0 ? (
               <div className="space-y-3">
-                {deals.map(deal => (
-                  <Link
-                    key={deal.id}
-                    href={`/deals/${deal.id}`}
-                    className="block p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-gray-900">{deal.name}</span>
-                      <span className="text-sm font-medium text-gray-600">
-                        ${deal.value.toLocaleString()}
-                      </span>
-                    </div>
-                    {deal.pipeline_stages && (
-                      <span
-                        className="inline-flex items-center gap-1 mt-1 text-xs"
-                        style={{ color: deal.pipeline_stages.color }}
-                      >
+                {deals.map(deal => {
+                  const stage = getFirst(deal.pipeline_stages)
+                  return (
+                    <Link
+                      key={deal.id}
+                      href={`/deals/${deal.id}`}
+                      className="block p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-gray-900">{deal.name}</span>
+                        <span className="text-sm font-medium text-gray-600">
+                          ${deal.value.toLocaleString()}
+                        </span>
+                      </div>
+                      {stage && (
                         <span
-                          className="w-1.5 h-1.5 rounded-full"
-                          style={{ backgroundColor: deal.pipeline_stages.color }}
-                        />
-                        {deal.pipeline_stages.name}
-                      </span>
-                    )}
-                  </Link>
-                ))}
+                          className="inline-flex items-center gap-1 mt-1 text-xs"
+                          style={{ color: stage.color }}
+                        >
+                          <span
+                            className="w-1.5 h-1.5 rounded-full"
+                            style={{ backgroundColor: stage.color }}
+                          />
+                          {stage.name}
+                        </span>
+                      )}
+                    </Link>
+                  )
+                })}
               </div>
             ) : (
               <p className="text-sm text-gray-500">No deals yet</p>

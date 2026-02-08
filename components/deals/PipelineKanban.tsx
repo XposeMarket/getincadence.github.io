@@ -20,14 +20,20 @@ interface Deal {
   company_id: string | null
   close_date: string | null
   created_at: string
-  contacts: { id: string; first_name: string; last_name: string } | null
-  companies: { id: string; name: string } | null
+  contacts: { id: string; first_name: string; last_name: string }[] | { id: string; first_name: string; last_name: string } | null
+  companies: { id: string; name: string }[] | { id: string; name: string } | null
 }
 
 interface PipelineKanbanProps {
   stages: PipelineStage[]
   deals: Deal[]
   onDealMove: (dealId: string, newStageId: string) => void
+}
+
+// Helper to get first item from Supabase join that could be array or object
+const getFirst = <T,>(data: T[] | T | null | undefined): T | null => {
+  if (!data) return null
+  return Array.isArray(data) ? data[0] || null : data
 }
 
 export default function PipelineKanban({ stages, deals, onDealMove }: PipelineKanbanProps) {
@@ -185,20 +191,26 @@ function DealCard({ deal, isDragging, onDragStart, onDragEnd, formatDate }: Deal
             )}
 
             <div className="flex items-center gap-3 mt-2 text-xs">
-              {deal.companies && (
-                <div className="flex items-center gap-1 text-gray-500">
-                  <Building2 size={12} />
-                  <span className="truncate max-w-[80px]">{deal.companies.name}</span>
-                </div>
-              )}
-              {deal.contacts && (
-                <div className="flex items-center gap-1 text-gray-500">
-                  <User size={12} />
-                  <span className="truncate max-w-[80px]">
-                    {deal.contacts.first_name} {deal.contacts.last_name}
-                  </span>
-                </div>
-              )}
+              {(() => {
+                const dealCompany = getFirst(deal.companies)
+                return dealCompany && (
+                  <div className="flex items-center gap-1 text-gray-500">
+                    <Building2 size={12} />
+                    <span className="truncate max-w-[80px]">{dealCompany.name}</span>
+                  </div>
+                )
+              })()}
+              {(() => {
+                const dealContact = getFirst(deal.contacts)
+                return dealContact && (
+                  <div className="flex items-center gap-1 text-gray-500">
+                    <User size={12} />
+                    <span className="truncate max-w-[80px]">
+                      {dealContact.first_name} {dealContact.last_name}
+                    </span>
+                  </div>
+                )
+              })()}
             </div>
 
             {closeDate && (

@@ -56,7 +56,13 @@ interface Activity {
   type: string
   content: string
   created_at: string
-  users: { full_name: string } | null
+  users: { full_name: string }[] | { full_name: string } | null
+}
+
+// Helper to get first item from Supabase join that could be array or object
+const getFirst = <T,>(data: T[] | T | null): T | null => {
+  if (!data) return null
+  return Array.isArray(data) ? data[0] || null : data
 }
 
 export default function CompanyDetailPage({ params }: { params: { id: string } }) {
@@ -99,9 +105,9 @@ export default function CompanyDetailPage({ params }: { params: { id: string } }
     ])
     if (companyRes.data) setCompany(companyRes.data)
     if (contactsRes.data) setContacts(contactsRes.data)
-    if (dealsRes.data) setDeals(dealsRes.data)
-    if (tasksRes.data) setTasks(tasksRes.data)
-    if (activitiesRes.data) setActivities(activitiesRes.data)
+    if (dealsRes.data) setDeals(dealsRes.data as Deal[])
+    if (tasksRes.data) setTasks(tasksRes.data as Task[])
+    if (activitiesRes.data) setActivities(activitiesRes.data as Activity[])
     setLoading(false)
   }
 
@@ -207,12 +213,15 @@ export default function CompanyDetailPage({ params }: { params: { id: string } }
             <div className="flex items-center justify-between mb-4"><h3 className="font-semibold">Deals</h3><span className="text-sm text-gray-500">{deals.length}</span></div>
             {deals.length > 0 ? (
               <div className="space-y-2">
-                {deals.map(d => (
-                  <Link key={d.id} href={`/deals/${d.id}`} className="block p-3 bg-gray-50 rounded-lg hover:bg-gray-100">
-                    <div className="flex justify-between"><span className="font-medium">{d.name}</span><span className="text-sm">${d.value.toLocaleString()}</span></div>
-                    {d.pipeline_stages && <span className="text-xs" style={{ color: d.pipeline_stages.color }}>{d.pipeline_stages.name}</span>}
-                  </Link>
-                ))}
+                {deals.map(d => {
+                  const stage = getFirst(d.pipeline_stages)
+                  return (
+                    <Link key={d.id} href={`/deals/${d.id}`} className="block p-3 bg-gray-50 rounded-lg hover:bg-gray-100">
+                      <div className="flex justify-between"><span className="font-medium">{d.name}</span><span className="text-sm">${d.value.toLocaleString()}</span></div>
+                      {stage && <span className="text-xs" style={{ color: stage.color }}>{stage.name}</span>}
+                    </Link>
+                  )
+                })}
               </div>
             ) : <p className="text-sm text-gray-500">No deals yet</p>}
           </div>

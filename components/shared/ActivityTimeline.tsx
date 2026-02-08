@@ -17,11 +17,17 @@ interface Activity {
   type: string
   content: string
   created_at: string
-  users: { full_name: string } | null
+  users: { full_name: string }[] | { full_name: string } | null
 }
 
 interface ActivityTimelineProps {
   activities: Activity[]
+}
+
+// Helper to get first item from Supabase join that could be array or object
+const getFirst = <T,>(data: T[] | T | null | undefined): T | null => {
+  if (!data) return null
+  return Array.isArray(data) ? data[0] || null : data
 }
 
 export default function ActivityTimeline({ activities }: ActivityTimelineProps) {
@@ -85,12 +91,15 @@ export default function ActivityTimeline({ activities }: ActivityTimelineProps) 
                 <span className="font-medium text-gray-900">
                   {getActivityLabel(activity.type)}
                 </span>
-                {activity.users && (
-                  <>
-                    <span className="text-gray-400">by</span>
-                    <span className="text-gray-600">{activity.users.full_name}</span>
-                  </>
-                )}
+                {(() => {
+                  const user = getFirst(activity.users)
+                  return user && (
+                    <>
+                      <span className="text-gray-400">by</span>
+                      <span className="text-gray-600">{user.full_name}</span>
+                    </>
+                  )
+                })()}
               </div>
               {activity.content && (
                 <p className="mt-1 text-sm text-gray-600 whitespace-pre-wrap">

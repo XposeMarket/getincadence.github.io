@@ -11,22 +11,28 @@ interface Task {
   id: string
   title: string
   description: string | null
-  status: 'pending' | 'in_progress' | 'completed'
-  priority: 'low' | 'medium' | 'high'
+  status: 'pending' | 'in_progress' | 'completed' | 'open'
+  priority: 'low' | 'medium' | 'high' | 'normal'
   due_date: string | null
   contact_id: string | null
   company_id: string | null
   deal_id: string | null
   assigned_to: string | null
   created_at: string
-  contacts: { id: string; first_name: string; last_name: string } | null
-  companies: { id: string; name: string } | null
-  deals: { id: string; name: string } | null
-  assigned_user: { id: string; full_name: string } | null
+  contacts: { id: string; first_name: string; last_name: string }[] | { id: string; first_name: string; last_name: string } | null
+  companies: { id: string; name: string }[] | { id: string; name: string } | null
+  deals: { id: string; name: string }[] | { id: string; name: string } | null
+  assigned_user: { id: string; full_name: string }[] | { id: string; full_name: string } | null
 }
 
 type FilterStatus = 'all' | 'pending' | 'in_progress' | 'completed'
 type FilterPriority = 'all' | 'low' | 'medium' | 'high'
+
+// Helper to get first item from Supabase join that could be array or object
+const getFirst = <T,>(data: T[] | T | null | undefined): T | null => {
+  if (!data) return null
+  return Array.isArray(data) ? data[0] || null : data
+}
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([])
@@ -70,7 +76,7 @@ export default function TasksPage() {
       .eq('org_id', orgId)
       .order('due_date', { ascending: true, nullsFirst: false })
 
-    if (data) setTasks(data)
+    if (data) setTasks(data as Task[])
     setLoading(false)
   }
 
@@ -95,13 +101,16 @@ export default function TasksPage() {
     if (filterPriority !== 'all' && task.priority !== filterPriority) return false
     if (searchQuery) {
       const search = searchQuery.toLowerCase()
+      const taskContact = getFirst(task.contacts)
+      const taskCompany = getFirst(task.companies)
+      const taskDeal = getFirst(task.deals)
       return (
         task.title.toLowerCase().includes(search) ||
         task.description?.toLowerCase().includes(search) ||
-        task.contacts?.first_name?.toLowerCase().includes(search) ||
-        task.contacts?.last_name?.toLowerCase().includes(search) ||
-        task.companies?.name?.toLowerCase().includes(search) ||
-        task.deals?.name?.toLowerCase().includes(search)
+        taskContact?.first_name?.toLowerCase().includes(search) ||
+        taskContact?.last_name?.toLowerCase().includes(search) ||
+        taskCompany?.name?.toLowerCase().includes(search) ||
+        taskDeal?.name?.toLowerCase().includes(search)
       )
     }
     return true

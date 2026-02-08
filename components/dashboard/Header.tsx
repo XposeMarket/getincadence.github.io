@@ -268,6 +268,12 @@ function QuickDealModal({ onClose, onCreated }: { onClose: () => void; onCreated
     }
 
     // Get first stage
+    if (!pipeline) {
+      setError('Failed to find or create pipeline.')
+      setLoading(false)
+      return
+    }
+
     const { data: stage } = await supabase
       .from('pipeline_stages')
       .select('id, name')

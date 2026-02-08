@@ -43,8 +43,8 @@ interface Deal {
   close_date: string | null
   description: string | null
   created_at: string
-  contacts: { id: string; first_name: string; last_name: string; email: string | null } | null
-  companies: { id: string; name: string } | null
+  contacts: { id: string; first_name: string; last_name: string; email: string | null }[] | { id: string; first_name: string; last_name: string; email: string | null } | null
+  companies: { id: string; name: string }[] | { id: string; name: string } | null
 }
 
 interface Task {
@@ -61,6 +61,12 @@ interface Activity {
   body: string | null
   created_at: string
   metadata: any
+}
+
+// Helper to get first item from Supabase join that could be array or object
+const getFirst = <T,>(data: T[] | T | null): T | null => {
+  if (!data) return null
+  return Array.isArray(data) ? data[0] || null : data
 }
 
 export default function DealDetailPage({ params }: { params: { id: string } }) {
@@ -223,6 +229,9 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
   const currentStage = stages.find(s => s.id === deal.stage_id)
   const dealAmount = deal.amount || 0
 
+  const company = getFirst(deal.companies)
+  const contact = getFirst(deal.contacts)
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -231,11 +240,11 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
           <h1 className="text-2xl font-bold text-gray-900">{deal.name}</h1>
           <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
             {dealAmount > 0 && <span className="font-medium text-gray-900">${dealAmount.toLocaleString()}</span>}
-            {deal.companies && (
+            {company && (
               <>
                 <span>·</span>
-                <Link href={`/companies/${deal.companies.id}`} className="hover:text-primary-600">
-                  {deal.companies.name}
+                <Link href={`/companies/${company.id}`} className="hover:text-primary-600">
+                  {company.name}
                 </Link>
               </>
             )}
@@ -365,23 +374,23 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
             </div>
           </div>
 
-          {deal.contacts && (
+          {contact && (
             <div className="card p-6">
               <h3 className="font-semibold mb-4 text-gray-900">Contact</h3>
-              <Link href={`/contacts/${deal.contacts.id}`} className="block p-3 bg-gray-50 rounded-lg hover:bg-gray-100">
-                <p className="font-medium text-gray-900">{deal.contacts.first_name} {deal.contacts.last_name}</p>
-                {deal.contacts.email && <p className="text-xs text-gray-500">{deal.contacts.email}</p>}
+              <Link href={`/contacts/${contact.id}`} className="block p-3 bg-gray-50 rounded-lg hover:bg-gray-100">
+                <p className="font-medium text-gray-900">{contact.first_name} {contact.last_name}</p>
+                {contact.email && <p className="text-xs text-gray-500">{contact.email}</p>}
               </Link>
             </div>
           )}
 
-          {deal.companies && (
+          {company && (
             <div className="card p-6">
               <h3 className="font-semibold mb-4 text-gray-900">Company</h3>
-              <Link href={`/companies/${deal.companies.id}`} className="block p-3 bg-gray-50 rounded-lg hover:bg-gray-100">
+              <Link href={`/companies/${company.id}`} className="block p-3 bg-gray-50 rounded-lg hover:bg-gray-100">
                 <div className="flex items-center gap-3">
                   <Building2 size={16} className="text-gray-400" />
-                  <span className="font-medium text-gray-900">{deal.companies.name}</span>
+                  <span className="font-medium text-gray-900">{company.name}</span>
                 </div>
               </Link>
             </div>

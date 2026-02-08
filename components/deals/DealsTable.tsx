@@ -20,13 +20,19 @@ interface Deal {
   company_id: string | null
   close_date: string | null
   created_at: string
-  contacts: { id: string; first_name: string; last_name: string } | null
-  companies: { id: string; name: string } | null
+  contacts: { id: string; first_name: string; last_name: string }[] | { id: string; first_name: string; last_name: string } | null
+  companies: { id: string; name: string }[] | { id: string; name: string } | null
 }
 
 interface DealsTableProps {
   deals: Deal[]
   stages: PipelineStage[]
+}
+
+// Helper to get first item from Supabase join that could be array or object
+const getFirst = <T,>(data: T[] | T | null | undefined): T | null => {
+  if (!data) return null
+  return Array.isArray(data) ? data[0] || null : data
 }
 
 export default function DealsTable({ deals, stages }: DealsTableProps) {
@@ -122,30 +128,36 @@ export default function DealsTable({ deals, stages }: DealsTableProps) {
                   )}
                 </td>
                 <td className="px-6 py-4">
-                  {deal.contacts ? (
-                    <Link
-                      href={`/contacts/${deal.contacts.id}`}
-                      className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary-600"
-                    >
-                      <User size={14} />
-                      {deal.contacts.first_name} {deal.contacts.last_name}
-                    </Link>
-                  ) : (
-                    <span className="text-gray-400">—</span>
-                  )}
+                  {(() => {
+                    const dealContact = getFirst(deal.contacts)
+                    return dealContact ? (
+                      <Link
+                        href={`/contacts/${dealContact.id}`}
+                        className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary-600"
+                      >
+                        <User size={14} />
+                        {dealContact.first_name} {dealContact.last_name}
+                      </Link>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )
+                  })()}
                 </td>
                 <td className="px-6 py-4">
-                  {deal.companies ? (
-                    <Link
-                      href={`/companies/${deal.companies.id}`}
-                      className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary-600"
-                    >
-                      <Building2 size={14} />
-                      {deal.companies.name}
-                    </Link>
-                  ) : (
-                    <span className="text-gray-400">—</span>
-                  )}
+                  {(() => {
+                    const dealCompany = getFirst(deal.companies)
+                    return dealCompany ? (
+                      <Link
+                        href={`/companies/${dealCompany.id}`}
+                        className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary-600"
+                      >
+                        <Building2 size={14} />
+                        {dealCompany.name}
+                      </Link>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )
+                  })()}
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-600">
                   {formatDate(deal.close_date)}

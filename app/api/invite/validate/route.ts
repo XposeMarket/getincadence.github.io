@@ -59,7 +59,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       valid: true,
       maskedEmail: maskEmail(invite.email),
-      orgName: invite.orgs?.name || 'Unknown Organization',
+      orgName: (() => {
+        const orgs = invite.orgs as any;
+        if (!orgs) return 'Unknown Organization';
+        if (Array.isArray(orgs)) return orgs[0]?.name || 'Unknown Organization';
+        return orgs.name || 'Unknown Organization';
+      })(),
       role: invite.role,
     })
   } catch (error) {
