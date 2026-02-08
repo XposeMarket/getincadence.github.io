@@ -24,9 +24,20 @@ interface Deal {
   created_at: string
   updated_at: string
   close_date: string | null
+  metadata?: { close_reason?: string; close_notes?: string; closed_at?: string } | null
   pipeline_stages?: { name: string; color: string; is_won?: boolean; is_lost?: boolean }[] | { name: string; color: string; is_won?: boolean; is_lost?: boolean }
   contacts?: { first_name: string; last_name: string }[] | { first_name: string; last_name: string }
   companies?: { name: string }[] | { name: string }
+}
+
+const LOSS_REASON_LABELS: Record<string, string> = {
+  price: 'Price too high',
+  timing: 'Bad timing',
+  competitor: 'Went with competitor',
+  not_a_fit: 'Not a fit',
+  no_response: 'No response / Ghosted',
+  budget: 'Budget cut / No budget',
+  other: 'Other',
 }
 
 interface Task {
@@ -110,6 +121,15 @@ export default function ReportsPage() {
   const [winRate, setWinRate] = useState(0)
   const [avgDealSize, setAvgDealSize] = useState(0)
   const [avgSalesCycle, setAvgSalesCycle] = useState(0)
+  
+  // Deals lost
+  const [lostDealsCount, setLostDealsCount] = useState(0)
+  const [lostDealsValue, setLostDealsValue] = useState(0)
+  const [lossReasonBreakdown, setLossReasonBreakdown] = useState<{ reason: string; label: string; count: number; percentage: number }[]>([])
+  const [recentLostDeals, setRecentLostDeals] = useState<(Deal & { lossReason?: string })[]>([])
+  
+  // Avg time in stage
+  const [stageTimings, setStageTimings] = useState<{ stage: string; avgDays: number; color: string; dealCount: number }[]>([])
   
   const supabase = createClient()
 
@@ -205,7 +225,7 @@ export default function ReportsPage() {
           .from('deals')
           .select(`
             id, name, amount, stage_id, owner_id, contact_id, company_id, 
-            pipeline_id, created_at, updated_at, close_date,
+            pipeline_id, created_at, updated_at, close_date, metadata,
             pipeline_stages(name, color, is_won, is_lost),
             contacts(first_name, last_name),
             companies(name)
@@ -419,6 +439,105 @@ export default function ReportsPage() {
       } else {
         setAvgSalesCycle(0)
       }
+
+      // ========== DEALS LOST ==========
+      const lostDeals = deals.filter(d => {
+        const stage = getFirst(d.pipeline_stages)
+        return stage?.is_lost
+      })
+      setLostDealsCount(lostDeals.length)
+      setLostDealsValue(lostDeals.reduce((sum, d) => sum + (d.amount || 0), 0))
+
+      // Loss reason breakdown
+      const reasonCounts = new Map<string, number>()
+      lostDeals.forEach(d => {
+        const meta = d.metadata as any
+        const reason = meta?.close_reason || 'unknown'
+        reasonCounts.set(reason, (reasonCounts.get(reason) || 0) + 1)
+      })
+      const reasonBreakdown = Array.from(reasonCounts.entries())
+        .map(([reason, count]) => ({
+          reason,
+          label: LOSS_REASON_LABELS[reason] || (reason === 'unknown' ? 'No reason given' : reason),
+          count,
+          percentage: lostDeals.length > 0 ? Math.round((count / lostDeals.length) * 100) : 0
+        }))
+        .sort((a, b) => b.count - a.count)
+      setLossReasonBreakdown(reasonBreakdown)
+
+      // Recent lost deals (most recent 5)
+      const recentLost = lostDeals
+        .map(d => ({
+          ...d,
+          lossReason: (d.metadata as any)?.close_reason
+        }))
+        .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+        .slice(0, 5)
+      setRecentLostDeals(recentLost)
+
+      // ========== AVG TIME IN STAGE ==========
+      // For closed deals (won or lost), calculate how long they spent in their final stage
+      // We use all deals and their current stage + time since last update as an approximation
+      // For more accurate tracking, we look at deals per stage and average time
+      const stageTimeMap = new Map<string, { totalDays: number; count: number }>()
+      
+      // Group all closed deals by the stages they passed through
+      // Since we don't have a stage_history table, we approximate using:
+      // - Total deal lifecycle / number of stages = avg per stage (for closed deals)
+      // - Current open deals: time in current stage = now - updated_at
+      const closedDealsForTiming = deals.filter(d => {
+        const stage = getFirst(d.pipeline_stages)
+        return stage?.is_won || stage?.is_lost
+      })
+
+      // Calculate avg days per stage for closed deals
+      if (closedDealsForTiming.length > 0 && stages.length > 0) {
+        // For each stage, find deals currently in that stage (open deals)
+        // and estimate timing from closed deals
+        const activeStages = stages.filter(s => !s.is_won && !s.is_lost)
+        
+        activeStages.forEach(stage => {
+          // Open deals currently in this stage - how long they've been there
+          const dealsInStage = deals.filter(d => d.stage_id === stage.id)
+          let totalDays = 0
+          let count = 0
+
+          dealsInStage.forEach(d => {
+            const enteredStage = new Date(d.updated_at)
+            const now = new Date()
+            const days = Math.max(1, Math.ceil((now.getTime() - enteredStage.getTime()) / (1000 * 60 * 60 * 24)))
+            totalDays += days
+            count++
+          })
+
+          // Also estimate from closed deals: total cycle / active stages count
+          closedDealsForTiming.forEach(d => {
+            const created = new Date(d.created_at)
+            const closed = new Date(d.updated_at)
+            const totalCycleDays = Math.max(1, Math.ceil((closed.getTime() - created.getTime()) / (1000 * 60 * 60 * 24)))
+            const avgPerStage = totalCycleDays / Math.max(activeStages.length, 1)
+            totalDays += avgPerStage
+            count++
+          })
+
+          if (count > 0) {
+            stageTimeMap.set(stage.id, { totalDays, count })
+          }
+        })
+      }
+
+      const timings = stages
+        .filter(s => !s.is_won && !s.is_lost)
+        .map(stage => {
+          const data = stageTimeMap.get(stage.id)
+          return {
+            stage: stage.name,
+            avgDays: data ? Math.round(data.totalDays / data.count) : 0,
+            color: stage.color,
+            dealCount: data?.count || 0
+          }
+        })
+      setStageTimings(timings)
 
     } catch (error) {
       console.error('Failed to load reports data:', error)
@@ -889,6 +1008,173 @@ export default function ReportsPage() {
           </div>
           <p className="text-xs text-gray-500 mt-2">From created to won</p>
         </div>
+      </div>
+
+      {/* ========== DEALS LOST SECTION ========== */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        {/* Loss Reason Breakdown */}
+        <div className="card p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
+                <TrendingDown size={16} className="text-red-600" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-gray-900">Deals Lost</h2>
+                <p className="text-xs text-gray-500">{lostDealsCount} deals • ${lostDealsValue.toLocaleString()} lost</p>
+              </div>
+            </div>
+          </div>
+          {lossReasonBreakdown.length === 0 ? (
+            <p className="text-gray-500 text-sm">No lost deals yet — keep winning! 🎉</p>
+          ) : (
+            <div className="space-y-3">
+              {lossReasonBreakdown.map((item) => {
+                const colors: Record<string, string> = {
+                  price: '#EF4444',
+                  competitor: '#F97316',
+                  timing: '#EAB308',
+                  budget: '#EC4899',
+                  not_a_fit: '#8B5CF6',
+                  no_response: '#6B7280',
+                  other: '#94A3B8',
+                  unknown: '#CBD5E1'
+                }
+                const color = colors[item.reason] || '#94A3B8'
+                return (
+                  <div key={item.reason}>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                        <span className="text-gray-700 truncate">{item.label}</span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                        <span className="text-gray-400 text-xs">{item.percentage}%</span>
+                        <span className="font-medium text-gray-900">{item.count}</span>
+                      </div>
+                    </div>
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${item.percentage}%`, backgroundColor: color }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Recent Lost Deals */}
+        <div className="card p-4 sm:p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <h2 className="font-semibold text-gray-900">Recently Lost</h2>
+            {recentLostDeals.length > 0 && (
+              <span className="badge bg-red-100 text-red-700">{recentLostDeals.length}</span>
+            )}
+          </div>
+          {recentLostDeals.length === 0 ? (
+            <p className="text-gray-500 text-sm">No recently lost deals.</p>
+          ) : (
+            <div className="space-y-2">
+              {recentLostDeals.map(deal => {
+                const dealContact = getFirst(deal.contacts)
+                const dealCompany = getFirst(deal.companies)
+                const reasonLabel = deal.lossReason 
+                  ? (LOSS_REASON_LABELS[deal.lossReason] || deal.lossReason)
+                  : 'No reason given'
+                return (
+                  <Link 
+                    key={deal.id} 
+                    href={`/deals/${deal.id}`}
+                    className="flex items-center justify-between p-3 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-gray-900 truncate">{deal.name}</p>
+                      <p className="text-sm text-gray-500 truncate">
+                        {reasonLabel}
+                        {dealContact && ` • ${dealContact.first_name} ${dealContact.last_name}`}
+                        {dealCompany && ` • ${dealCompany.name}`}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        Lost {formatDistanceToNow(new Date(deal.updated_at), { addSuffix: true })}
+                      </p>
+                    </div>
+                    <span className="font-medium text-red-600 flex-shrink-0 ml-2">
+                      -${(deal.amount || 0).toLocaleString()}
+                    </span>
+                  </Link>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ========== AVG TIME IN STAGE SECTION ========== */}
+      <div className="card p-4 sm:p-6">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+            <Clock size={16} className="text-indigo-600" />
+          </div>
+          <div>
+            <h2 className="font-semibold text-gray-900">Avg. Time in Stage</h2>
+            <p className="text-xs text-gray-500">How long deals stay in each pipeline stage</p>
+          </div>
+        </div>
+        {stageTimings.length === 0 ? (
+          <p className="text-gray-500 text-sm mt-4">No stage data yet. Add deals to your pipeline to see timing insights.</p>
+        ) : (
+          <div className="mt-4">
+            {/* Stage timing bars */}
+            <div className="space-y-4">
+              {stageTimings.map((stage) => {
+                const maxDays = Math.max(...stageTimings.map(s => s.avgDays), 1)
+                const width = (stage.avgDays / maxDays) * 100
+                return (
+                  <div key={stage.stage}>
+                    <div className="flex items-center justify-between text-sm mb-1.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: stage.color }} />
+                        <span className="text-gray-700 font-medium truncate">{stage.stage}</span>
+                      </div>
+                      <div className="flex items-center gap-3 flex-shrink-0 ml-2">
+                        <span className="text-xs text-gray-400">{stage.dealCount} deals</span>
+                        <span className="font-semibold text-gray-900">
+                          {stage.avgDays} {stage.avgDays === 1 ? 'day' : 'days'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-700 relative"
+                        style={{ width: `${Math.max(width, 3)}%`, backgroundColor: stage.color }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            
+            {/* Summary insight */}
+            {stageTimings.length > 1 && (() => {
+              const slowest = stageTimings.reduce((a, b) => a.avgDays > b.avgDays ? a : b)
+              const fastest = stageTimings.reduce((a, b) => a.avgDays < b.avgDays ? a : b)
+              const totalAvg = stageTimings.reduce((sum, s) => sum + s.avgDays, 0)
+              return (
+                <div className="mt-4 p-3 bg-indigo-50 rounded-lg border border-indigo-100">
+                  <p className="text-sm text-indigo-800">
+                    <span className="font-medium">💡 Insight:</span>{' '}
+                    Deals spend the most time in <span className="font-semibold">{slowest.stage}</span> ({slowest.avgDays} days) 
+                    and move fastest through <span className="font-semibold">{fastest.stage}</span> ({fastest.avgDays} days). 
+                    Total pipeline time averages <span className="font-semibold">{totalAvg} days</span>.
+                  </p>
+                </div>
+              )
+            })()}
+          </div>
+        )}
       </div>
     </div>
   )
