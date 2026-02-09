@@ -617,12 +617,12 @@ function EditDealModal({ deal, stages, contacts, companies, onClose, onSaved }: 
   const [description, setDescription] = useState(deal.description || '')
   
   // Photographer-specific fields
-  const [bookingType, setBookingType] = useState(deal.booking_type || 'personal')
+  const [bookingType, setBookingType] = useState<string>(deal.booking_type || 'personal')
   const [numPeople, setNumPeople] = useState(deal.num_people?.toString() || '')
   const [eventDate, setEventDate] = useState(deal.event_date || '')
   const [eventStartTime, setEventStartTime] = useState(deal.event_start_time || '')
   const [eventEndTime, setEventEndTime] = useState(deal.event_end_time || '')
-  const [locationType, setLocationType] = useState(deal.location_type || 'client')
+  const [locationType, setLocationType] = useState<string>(deal.location_type || 'client')
   const [location, setLocation] = useState(deal.location || '')
   const [specialRequests, setSpecialRequests] = useState(deal.special_requests || '')
   

@@ -56,12 +56,12 @@ export default function CreateDealModal({ pipelineId, stages, onClose, onCreated
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   
   // Photographer-specific fields
-  const [bookingType, setBookingType] = useState<'personal' | 'event'>('personal')
+  const [bookingType, setBookingType] = useState<string>('personal')
   const [numPeople, setNumPeople] = useState('')
   const [eventDate, setEventDate] = useState('')
   const [eventStartTime, setEventStartTime] = useState('')
   const [eventEndTime, setEventEndTime] = useState('')
-  const [locationType, setLocationType] = useState<'provided' | 'flexible'>('flexible')
+  const [locationType, setLocationType] = useState<string>('client')
   const [location, setLocation] = useState('')
   const [specialRequests, setSpecialRequests] = useState('')
   

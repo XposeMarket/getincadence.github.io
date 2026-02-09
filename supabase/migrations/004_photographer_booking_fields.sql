@@ -21,11 +21,11 @@ ALTER TABLE deals ADD COLUMN IF NOT EXISTS special_requests TEXT;
 
 -- Add constraint for booking_type
 ALTER TABLE deals ADD CONSTRAINT booking_type_check 
-  CHECK (booking_type IS NULL OR booking_type IN ('personal', 'event'));
+  CHECK (booking_type IS NULL OR booking_type IN ('personal', 'event', 'commercial', 'wedding', 'portrait', 'other'));
 
 -- Add constraint for location_type
 ALTER TABLE deals ADD CONSTRAINT location_type_check 
-  CHECK (location_type IS NULL OR location_type IN ('provided', 'flexible'));
+  CHECK (location_type IS NULL OR location_type IN ('provided', 'flexible', 'client', 'studio', 'outdoor', 'venue', 'other'));
 
 -- Add index for event_date (useful for calendar views)
 CREATE INDEX IF NOT EXISTS idx_deals_event_date ON deals(event_date);
