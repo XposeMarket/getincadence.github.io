@@ -23,6 +23,7 @@ export interface IndustryConfig {
     activity: string
   }
   features: {
+    showCompanies: boolean
     showSalesReports: boolean
     showForecast: boolean
     showConversionFunnel: boolean
@@ -56,6 +57,7 @@ export const INDUSTRY_CONFIGS: Record<IndustryType, IndustryConfig> = {
       activity: 'Activity',
     },
     features: {
+      showCompanies: true,
       showSalesReports: true,
       showForecast: true,
       showConversionFunnel: true,
@@ -88,6 +90,7 @@ export const INDUSTRY_CONFIGS: Record<IndustryType, IndustryConfig> = {
       activity: 'Activity',
     },
     features: {
+      showCompanies: false,
       showSalesReports: false,
       showForecast: false,
       showConversionFunnel: false,

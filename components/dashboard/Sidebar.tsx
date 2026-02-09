@@ -20,7 +20,7 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import { getPermissions, UserRole } from '@/lib/permissions'
-import { getTerminology, IndustryType } from '@/lib/industry-config'
+import { getTerminology, getIndustryFeatures, IndustryType } from '@/lib/industry-config'
 
 interface SidebarProps {
   user: {
@@ -43,6 +43,7 @@ interface NavItem {
   href: string
   icon: LucideIcon
   adminOnly?: boolean
+  requireFeature?: 'showCompanies'
 }
 
 // Get navigation items based on industry terminology
@@ -51,7 +52,7 @@ function getNavigation(terminology: ReturnType<typeof getTerminology>): NavItem[
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Planner', href: '/planner', icon: CalendarDays },
     { name: terminology.contacts, href: '/contacts', icon: Users },
-    { name: 'Companies', href: '/companies', icon: Building2 },
+    { name: 'Companies', href: '/companies', icon: Building2, requireFeature: 'showCompanies' },
     { name: terminology.deals, href: '/deals', icon: Handshake },
     { name: terminology.tasks, href: '/tasks', icon: CheckSquare },
     { name: terminology.reports, href: '/reports', icon: BarChart3, adminOnly: true },
@@ -69,6 +70,7 @@ export default function Sidebar({ user, isOpen = true, onClose }: SidebarProps) 
   const permissions = getPermissions(user.role as UserRole)
   const industryType = (user.orgs.industry_type as IndustryType) || 'default'
   const terminology = getTerminology(industryType)
+  const features = getIndustryFeatures(industryType)
   const navigation = getNavigation(terminology)
 
   const handleLinkClick = () => {
@@ -76,8 +78,12 @@ export default function Sidebar({ user, isOpen = true, onClose }: SidebarProps) 
     if (onClose) onClose()
   }
 
-  // Filter navigation based on permissions
+  // Filter navigation based on permissions and features
   const filteredNavigation = navigation.filter(item => {
+    // Check feature requirements
+    if (item.requireFeature === 'showCompanies' && !features.showCompanies) {
+      return false
+    }
     if (item.adminOnly) {
       if (item.href === '/reports') return permissions.canAccessReports
       if (item.href === '/automations') return permissions.canAccessAutomations

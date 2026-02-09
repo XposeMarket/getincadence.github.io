@@ -10,6 +10,7 @@ import CreateTaskModal from '@/components/tasks/CreateTaskModal'
 import { DEMO_ORG_ID } from '@/lib/constants'
 import { ActivityLogger } from '@/lib/activity-logger'
 import { formatDistanceToNow } from 'date-fns'
+import { useIndustry } from '@/lib/contexts/IndustryContext'
 
 interface Notification {
   id: string
@@ -154,11 +155,14 @@ export default function Header({ user, onMenuClick }: HeaderProps) {
     router.refresh()
   }
 
+  const { terminology, config } = useIndustry()
+  const showCompanies = config.features.showCompanies
+
   const quickAddOptions = [
-    { id: 'contact' as const, label: 'Contact', icon: Users, color: 'text-blue-600 bg-blue-100' },
-    { id: 'company' as const, label: 'Company', icon: Building2, color: 'text-teal-600 bg-teal-100' },
-    { id: 'deal' as const, label: 'Deal', icon: Handshake, color: 'text-pink-600 bg-pink-100' },
-    { id: 'task' as const, label: 'Task', icon: CheckSquare, color: 'text-yellow-600 bg-yellow-100' },
+    { id: 'contact' as const, label: terminology.contact, icon: Users, color: 'text-blue-600 bg-blue-100' },
+    ...(showCompanies ? [{ id: 'company' as const, label: 'Company', icon: Building2, color: 'text-teal-600 bg-teal-100' }] : []),
+    { id: 'deal' as const, label: terminology.deal, icon: Handshake, color: 'text-pink-600 bg-pink-100' },
+    { id: 'task' as const, label: terminology.task, icon: CheckSquare, color: 'text-yellow-600 bg-yellow-100' },
   ]
 
   const handleQuickAdd = (type: 'contact' | 'company' | 'deal' | 'task') => {
@@ -384,6 +388,7 @@ function QuickDealModal({ onClose, onCreated }: { onClose: () => void; onCreated
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const supabase = createClient()
+  const { terminology } = useIndustry()
 
   const createDefaultPipeline = async () => {
     const { data: pipeline, error: pipelineError } = await supabase
@@ -496,7 +501,7 @@ function QuickDealModal({ onClose, onCreated }: { onClose: () => void; onCreated
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md animate-slide-up">
         <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Quick Add Deal</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Quick Add {terminology.deal}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">✕</button>
         </div>
 
@@ -508,7 +513,7 @@ function QuickDealModal({ onClose, onCreated }: { onClose: () => void; onCreated
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Deal Name *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">{terminology.deal} Name *</label>
             <input
               type="text"
               value={name}
@@ -538,7 +543,7 @@ function QuickDealModal({ onClose, onCreated }: { onClose: () => void; onCreated
           <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
             <button type="button" onClick={onClose} className="btn btn-secondary">Cancel</button>
             <button type="submit" disabled={loading} className="btn btn-primary">
-              {loading ? 'Creating...' : 'Create Deal'}
+              {loading ? 'Creating...' : `Create ${terminology.deal}`}
             </button>
           </div>
         </form>

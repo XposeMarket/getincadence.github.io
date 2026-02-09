@@ -6,6 +6,7 @@ import { getCurrentUserOrgId } from '@/lib/org-helpers'
 import { X, Loader2, Zap } from 'lucide-react'
 import { ActivityLogger } from '@/lib/activity-logger'
 import { onDealCreated } from '@/lib/automation-engine'
+import { useIndustry } from '@/lib/contexts/IndustryContext'
 
 interface PipelineStage {
   id: string
@@ -53,7 +54,20 @@ export default function CreateDealModal({ pipelineId, stages, onClose, onCreated
   const [automationRan, setAutomationRan] = useState(false)
   const [orgId, setOrgId] = useState<string | null>(null)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  
+  // Photographer-specific fields
+  const [bookingType, setBookingType] = useState<'personal' | 'event'>('personal')
+  const [numPeople, setNumPeople] = useState('')
+  const [eventDate, setEventDate] = useState('')
+  const [eventStartTime, setEventStartTime] = useState('')
+  const [eventEndTime, setEventEndTime] = useState('')
+  const [locationType, setLocationType] = useState<'provided' | 'flexible'>('flexible')
+  const [location, setLocation] = useState('')
+  const [specialRequests, setSpecialRequests] = useState('')
+  
   const supabase = createClient()
+  const { terminology, config } = useIndustry()
+  const isPhotographer = config.id === 'photographer'
 
   useEffect(() => {
     const init = async () => {
@@ -122,10 +136,21 @@ export default function CreateDealModal({ pipelineId, stages, onClose, onCreated
         pipeline_id: pipelineId,
         stage_id: stageId,
         contact_id: contactId || null,
-        company_id: companyId || null,
+        company_id: isPhotographer ? null : (companyId || null),
         owner_id: ownerId || currentUserId || null,
         close_date: expectedCloseDate || null,
         org_id: orgId,
+        // Photographer-specific fields
+        ...(isPhotographer && {
+          booking_type: bookingType,
+          num_people: bookingType === 'event' && numPeople ? parseInt(numPeople) : null,
+          event_date: eventDate || null,
+          event_start_time: eventStartTime || null,
+          event_end_time: eventEndTime || null,
+          location_type: locationType,
+          location: locationType === 'provided' ? location : null,
+          special_requests: specialRequests || null,
+        }),
       })
       .select('id')
       .single()
@@ -176,13 +201,13 @@ export default function CreateDealModal({ pipelineId, stages, onClose, onCreated
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg animate-slide-up">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Create Deal</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Create {terminology.deal}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
           {error && (
             <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg">
               {error}
@@ -192,29 +217,82 @@ export default function CreateDealModal({ pipelineId, stages, onClose, onCreated
           {automationRan && (
             <div className="p-3 text-sm text-primary-700 bg-primary-50 border border-primary-200 rounded-lg flex items-center gap-2">
               <Zap size={16} className="text-primary-500" />
-              <span>Task created: "Qualify deal: {name}"</span>
+              <span>Task created: "Qualify {terminology.deal.toLowerCase()}: {name}"</span>
             </div>
           )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Deal Name *
+              {terminology.deal} Name *
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g., Website Redesign Project"
+              placeholder={isPhotographer ? "e.g., Smith Wedding" : "e.g., Website Redesign Project"}
               required
               className="input"
               disabled={loading || automationRan}
             />
           </div>
 
+          {/* Photographer: Booking Type */}
+          {isPhotographer && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Booking Type *
+              </label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="bookingType"
+                    value="personal"
+                    checked={bookingType === 'personal'}
+                    onChange={() => setBookingType('personal')}
+                    disabled={loading || automationRan}
+                    className="text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="text-sm text-gray-700">Personal Shoot</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="bookingType"
+                    value="event"
+                    checked={bookingType === 'event'}
+                    onChange={() => setBookingType('event')}
+                    disabled={loading || automationRan}
+                    className="text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="text-sm text-gray-700">Event</span>
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* Photographer: Number of People (for events) */}
+          {isPhotographer && bookingType === 'event' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Number of People
+              </label>
+              <input
+                type="number"
+                value={numPeople}
+                onChange={(e) => setNumPeople(e.target.value)}
+                placeholder="e.g., 50"
+                min="1"
+                className="input"
+                disabled={loading || automationRan}
+              />
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Value
+                {terminology.dealAmount}
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
@@ -251,10 +329,113 @@ export default function CreateDealModal({ pipelineId, stages, onClose, onCreated
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          {/* Photographer: Event Date & Time */}
+          {isPhotographer && (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    {terminology.closeDate}
+                  </label>
+                  <input
+                    type="date"
+                    value={eventDate}
+                    onChange={(e) => setEventDate(e.target.value)}
+                    className="input"
+                    disabled={loading || automationRan}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Start Time
+                    </label>
+                    <input
+                      type="time"
+                      value={eventStartTime}
+                      onChange={(e) => setEventStartTime(e.target.value)}
+                      className="input"
+                      disabled={loading || automationRan}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      End Time
+                    </label>
+                    <input
+                      type="time"
+                      value={eventEndTime}
+                      onChange={(e) => setEventEndTime(e.target.value)}
+                      className="input"
+                      disabled={loading || automationRan}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Location
+                </label>
+                <div className="flex gap-4 mb-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="locationType"
+                      value="flexible"
+                      checked={locationType === 'flexible'}
+                      onChange={() => setLocationType('flexible')}
+                      disabled={loading || automationRan}
+                      className="text-primary-600 focus:ring-primary-500"
+                    />
+                    <span className="text-sm text-gray-700">TBD / Flexible</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="locationType"
+                      value="provided"
+                      checked={locationType === 'provided'}
+                      onChange={() => setLocationType('provided')}
+                      disabled={loading || automationRan}
+                      className="text-primary-600 focus:ring-primary-500"
+                    />
+                    <span className="text-sm text-gray-700">Specific Location</span>
+                  </label>
+                </div>
+                {locationType === 'provided' && (
+                  <input
+                    type="text"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="e.g., Central Park, NYC"
+                    className="input"
+                    disabled={loading || automationRan}
+                  />
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Special Requests / Notes
+                </label>
+                <textarea
+                  value={specialRequests}
+                  onChange={(e) => setSpecialRequests(e.target.value)}
+                  placeholder="Any special requests or notes for this booking..."
+                  rows={2}
+                  className="input resize-none"
+                  disabled={loading || automationRan}
+                />
+              </div>
+            </>
+          )}
+
+          {/* Contact / Client selector */}
+          <div className={isPhotographer ? '' : 'grid grid-cols-2 gap-4'}>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Contact
+                {terminology.contact}
               </label>
               <select
                 value={contactId}
@@ -262,7 +443,7 @@ export default function CreateDealModal({ pipelineId, stages, onClose, onCreated
                 className="input"
                 disabled={loading || automationRan}
               >
-                <option value="">Select contact...</option>
+                <option value="">Select {terminology.contact.toLowerCase()}...</option>
                 {contacts.map(contact => (
                   <option key={contact.id} value={contact.id}>
                     {contact.first_name} {contact.last_name}
@@ -271,59 +452,65 @@ export default function CreateDealModal({ pipelineId, stages, onClose, onCreated
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Company
-              </label>
-              <select
-                value={companyId}
-                onChange={(e) => setCompanyId(e.target.value)}
-                className="input"
-                disabled={loading || automationRan}
-              >
-                <option value="">Select company...</option>
-                {companies.map(company => (
-                  <option key={company.id} value={company.id}>
-                    {company.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Company - only for non-photographer */}
+            {!isPhotographer && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Company
+                </label>
+                <select
+                  value={companyId}
+                  onChange={(e) => setCompanyId(e.target.value)}
+                  className="input"
+                  disabled={loading || automationRan}
+                >
+                  <option value="">Select company...</option>
+                  {companies.map(company => (
+                    <option key={company.id} value={company.id}>
+                      {company.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Owner
-              </label>
-              <select
-                value={ownerId}
-                onChange={(e) => setOwnerId(e.target.value)}
-                className="input"
-                disabled={loading || automationRan}
-              >
-                <option value="">Unassigned</option>
-                {users.map(user => (
-                  <option key={user.id} value={user.id}>
-                    {user.full_name}
-                  </option>
-                ))}
-              </select>
-            </div>
+          {/* Owner and Close Date - for non-photographers */}
+          {!isPhotographer && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Owner
+                </label>
+                <select
+                  value={ownerId}
+                  onChange={(e) => setOwnerId(e.target.value)}
+                  className="input"
+                  disabled={loading || automationRan}
+                >
+                  <option value="">Unassigned</option>
+                  {users.map(user => (
+                    <option key={user.id} value={user.id}>
+                      {user.full_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Expected Close Date
-              </label>
-              <input
-                type="date"
-                value={expectedCloseDate}
-                onChange={(e) => setExpectedCloseDate(e.target.value)}
-                className="input"
-                disabled={loading || automationRan}
-              />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  {terminology.closeDate}
+                </label>
+                <input
+                  type="date"
+                  value={expectedCloseDate}
+                  onChange={(e) => setExpectedCloseDate(e.target.value)}
+                  className="input"
+                  disabled={loading || automationRan}
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-4">
             <button type="button" onClick={onClose} className="btn btn-secondary" disabled={loading || automationRan}>
@@ -341,7 +528,7 @@ export default function CreateDealModal({ pipelineId, stages, onClose, onCreated
                   Created!
                 </>
               ) : (
-                'Create Deal'
+                `Create ${terminology.deal}`
               )}
             </button>
           </div>
