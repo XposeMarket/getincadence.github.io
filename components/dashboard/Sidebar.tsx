@@ -188,7 +188,7 @@ export default function Sidebar({ user, isOpen = true, onClose }: SidebarProps) 
   return (
     <>
       {/* Desktop sidebar - hidden on mobile */}
-      <aside className="hidden lg:flex w-64 bg-cadence-navy flex-col flex-shrink-0">
+      <aside className="hidden lg:flex w-64 bg-cadence-navy flex-col flex-shrink-0 h-screen sticky top-0">
         {sidebarContent}
       </aside>
 
