@@ -467,6 +467,17 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
             </div>
           </div>
 
+          {/* Description / Message */}
+          {deal.description && (
+            <div className="card p-4 sm:p-6">
+              <h3 className="font-semibold mb-3 text-gray-900 flex items-center gap-2">
+                <MessageSquare size={16} className="text-gray-400" />
+                {isPhotographer ? 'Notes' : 'Notes'}
+              </h3>
+              <p className="text-sm text-gray-600 whitespace-pre-wrap">{deal.description}</p>
+            </div>
+          )}
+
           {/* Contact / Client */}
           {contact && (
             <div className="card p-4 sm:p-6">

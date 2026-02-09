@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { User, Building2, Users, CreditCard, Bell, Shield, Palette, Check, Loader2, AlertCircle, Lock, ArrowUpRight, Crown, X, Trash2, ShieldCheck, Eye, RefreshCw } from 'lucide-react'
+import { User, Building2, Users, CreditCard, Bell, Shield, Palette, Check, Loader2, AlertCircle, Lock, ArrowUpRight, Crown, X, Trash2, ShieldCheck, Eye, RefreshCw, CheckSquare as CheckSquareIcon, FileText, Copy, ExternalLink, Upload, ImageIcon } from 'lucide-react'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
 import { getPermissions, UserRole } from '@/lib/permissions'
 import { INDUSTRY_CONFIGS, IndustryType, getIndustryConfig } from '@/lib/industry-config'
 
-type SettingsTab = 'profile' | 'organization' | 'team' | 'billing' | 'notifications' | 'security' | 'appearance'
+type SettingsTab = 'profile' | 'organization' | 'lead_form' | 'team' | 'billing' | 'notifications' | 'security' | 'appearance'
 type AccentColor = '#E91E8C' | '#3B82F6' | '#10B981' | '#F59E0B' | '#8B5CF6'
 
 interface SubscriptionInfo {
@@ -55,6 +55,7 @@ export default function SettingsPage() {
   const allTabs = [
     { id: 'profile' as const, label: 'Profile', icon: User },
     { id: 'organization' as const, label: 'Organization', icon: Building2 },
+    { id: 'lead_form' as const, label: 'Lead Form', icon: FileText, adminOnly: true },
     { id: 'team' as const, label: 'Team Members', icon: Users },
     { id: 'billing' as const, label: 'Billing', icon: CreditCard, adminOnly: true },
     { id: 'notifications' as const, label: 'Notifications', icon: Bell },
@@ -109,6 +110,7 @@ export default function SettingsPage() {
         <div className="flex-1 min-w-0">
           {activeTab === 'profile' && <ProfileSettings />}
           {activeTab === 'organization' && <OrganizationSettings canEdit={permissions.canEditOrganization} />}
+          {activeTab === 'lead_form' && <LeadFormSettings />}
           {activeTab === 'team' && <TeamSettings />}
           {activeTab === 'billing' && <BillingSettings />}
           {activeTab === 'notifications' && <NotificationSettings />}
@@ -322,6 +324,8 @@ function OrganizationSettings({ canEdit = true }: { canEdit?: boolean }) {
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [orgId, setOrgId] = useState<string | null>(null)
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     industry: '',
@@ -373,9 +377,80 @@ function OrganizationSettings({ canEdit = true }: { canEdit?: boolean }) {
         phone: org.phone || '',
         address: org.address || '',
       })
+      setLogoUrl(org.logo_url || null)
     }
 
     setLoading(false)
+  }
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !orgId) return
+
+    // Validate file
+    if (!file.type.startsWith('image/')) {
+      setError('Please upload an image file')
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setError('Logo must be under 2MB')
+      return
+    }
+
+    setUploadingLogo(true)
+    setError(null)
+
+    try {
+      const fileExt = file.name.split('.').pop()
+      const filePath = `logos/${orgId}/logo.${fileExt}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('org-assets')
+        .upload(filePath, file, { upsert: true })
+
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('org-assets')
+        .getPublicUrl(filePath)
+
+      // Add cache-busting param
+      const logoUrlWithCache = `${publicUrl}?t=${Date.now()}`
+
+      const { error: updateError } = await supabase
+        .from('orgs')
+        .update({ logo_url: logoUrlWithCache })
+        .eq('id', orgId)
+
+      if (updateError) throw updateError
+
+      setLogoUrl(logoUrlWithCache)
+    } catch (err: any) {
+      console.error('Logo upload error:', err)
+      setError(err.message || 'Failed to upload logo')
+    } finally {
+      setUploadingLogo(false)
+    }
+  }
+
+  const handleRemoveLogo = async () => {
+    if (!orgId) return
+    setUploadingLogo(true)
+    setError(null)
+
+    try {
+      const { error: updateError } = await supabase
+        .from('orgs')
+        .update({ logo_url: null })
+        .eq('id', orgId)
+
+      if (updateError) throw updateError
+      setLogoUrl(null)
+    } catch (err: any) {
+      setError(err.message || 'Failed to remove logo')
+    } finally {
+      setUploadingLogo(false)
+    }
   }
 
   const handleSave = async () => {
@@ -477,6 +552,62 @@ function OrganizationSettings({ canEdit = true }: { canEdit?: boolean }) {
           disabled={!canEdit}
           className={`input ${!canEdit ? 'bg-gray-50 text-gray-600 cursor-not-allowed' : ''}`}
         />
+      </div>
+
+      {/* Logo Upload */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Organization Logo</label>
+        <div className="flex items-center gap-4">
+          {logoUrl ? (
+            <div className="relative">
+              <img
+                src={logoUrl}
+                alt="Organization logo"
+                className="h-16 w-auto max-w-[200px] object-contain rounded-lg border border-gray-200 p-1"
+              />
+              {canEdit && (
+                <button
+                  onClick={handleRemoveLogo}
+                  disabled={uploadingLogo}
+                  className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                  title="Remove logo"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="h-16 w-16 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
+              <ImageIcon size={24} className="text-gray-400" />
+            </div>
+          )}
+          {canEdit && (
+            <div>
+              <label className="btn btn-secondary text-sm cursor-pointer">
+                {uploadingLogo ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin mr-1.5" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload size={14} className="mr-1.5" />
+                    {logoUrl ? 'Change Logo' : 'Upload Logo'}
+                  </>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  disabled={uploadingLogo}
+                  className="sr-only"
+                />
+              </label>
+              <p className="text-xs text-gray-400 mt-1">PNG, JPG, or SVG. Max 2MB.</p>
+            </div>
+          )}
+        </div>
+        <p className="text-xs text-gray-500 mt-2">Your logo appears on your public lead intake form.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -807,6 +938,24 @@ function IndustryTypeSettings() {
           </div>
         </div>
 
+        {/* Task templates preview */}
+        {industryConfig.defaultTaskTemplates && industryConfig.defaultTaskTemplates.length > 0 && (
+          <div className="bg-gray-50 rounded-lg p-4">
+            <p className="text-sm font-medium text-gray-700 mb-3">Suggested task templates:</p>
+            <div className="space-y-1.5">
+              {industryConfig.defaultTaskTemplates.map((task, index) => (
+                <div key={index} className="flex items-start gap-2 text-xs">
+                  <CheckSquareIcon size={14} className="text-gray-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <span className="font-medium text-gray-700">{task.name}</span>
+                    <span className="text-gray-500 ml-1">— {task.description}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Terminology preview */}
         <div className="bg-gray-50 rounded-lg p-4">
           <p className="text-sm font-medium text-gray-700 mb-2">Terminology:</p>
@@ -882,6 +1031,313 @@ function IndustryTypeSettings() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function LeadFormSettings() {
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [success, setSuccess] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [orgId, setOrgId] = useState<string | null>(null)
+  const [slug, setSlug] = useState('')
+  const [savedSlug, setSavedSlug] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const supabase = createClient()
+
+  useEffect(() => {
+    loadFormSettings()
+  }, [])
+
+  const loadFormSettings = async () => {
+    setLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setLoading(false); return }
+
+    const { data: profile } = await supabase
+      .from('users')
+      .select('org_id')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile?.org_id) { setLoading(false); return }
+    setOrgId(profile.org_id)
+
+    const { data: org } = await supabase
+      .from('orgs')
+      .select('intake_form_slug')
+      .eq('id', profile.org_id)
+      .single()
+
+    if (org?.intake_form_slug) {
+      setSlug(org.intake_form_slug)
+      setSavedSlug(org.intake_form_slug)
+    }
+    setLoading(false)
+  }
+
+  const handleSave = async () => {
+    if (!orgId || !slug.trim()) return
+
+    // Validate slug format
+    const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+    const cleanSlug = slug.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+
+    if (!slugRegex.test(cleanSlug)) {
+      setError('Slug can only contain lowercase letters, numbers, and hyphens')
+      return
+    }
+
+    if (cleanSlug.length < 3) {
+      setError('Slug must be at least 3 characters')
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+    setSuccess(false)
+
+    const { error: updateError } = await supabase
+      .from('orgs')
+      .update({ intake_form_slug: cleanSlug })
+      .eq('id', orgId)
+
+    if (updateError) {
+      if (updateError.message.includes('unique') || updateError.message.includes('duplicate')) {
+        setError('This URL slug is already taken. Please choose another.')
+      } else {
+        setError(updateError.message)
+      }
+    } else {
+      setSlug(cleanSlug)
+      setSavedSlug(cleanSlug)
+      setSuccess(true)
+      setTimeout(() => setSuccess(false), 3000)
+    }
+    setSaving(false)
+  }
+
+  const handleDisable = async () => {
+    if (!orgId) return
+    setSaving(true)
+    setError(null)
+
+    const { error: updateError } = await supabase
+      .from('orgs')
+      .update({ intake_form_slug: null })
+      .eq('id', orgId)
+
+    if (updateError) {
+      setError(updateError.message)
+    } else {
+      setSlug('')
+      setSavedSlug(null)
+      setSuccess(true)
+      setTimeout(() => setSuccess(false), 3000)
+    }
+    setSaving(false)
+  }
+
+  const formUrl = savedSlug ? `${typeof window !== 'undefined' ? window.location.origin : ''}/f/${savedSlug}` : null
+
+  const copyUrl = () => {
+    if (formUrl) {
+      navigator.clipboard.writeText(formUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="card p-6">
+        <div className="flex items-center justify-center py-12">
+          <LoadingSpinner size="md" />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Main Settings Card */}
+      <div className="card p-6 space-y-6">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">Lead Intake Form</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Create a public form where potential clients can submit inquiries directly to your CRM
+          </p>
+        </div>
+
+        {error && (
+          <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
+            <AlertCircle size={16} />
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="p-3 text-sm text-green-600 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
+            <Check size={16} />
+            Settings saved!
+          </div>
+        )}
+
+        {/* Slug Configuration */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Form URL</label>
+          <div className="flex gap-2">
+            <div className="flex items-center bg-gray-100 border border-gray-300 rounded-l-lg px-3 text-sm text-gray-500 border-r-0 whitespace-nowrap">
+              {typeof window !== 'undefined' ? window.location.origin : ''}/f/
+            </div>
+            <input
+              type="text"
+              value={slug}
+              onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''))}
+              placeholder="your-business-name"
+              className="input rounded-l-none flex-1"
+              disabled={saving}
+            />
+          </div>
+          <p className="text-xs text-gray-500 mt-1.5">Lowercase letters, numbers, and hyphens only. Minimum 3 characters.</p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleSave}
+            disabled={saving || !slug.trim() || slug.trim().length < 3}
+            className="btn btn-primary"
+          >
+            {saving ? (
+              <>
+                <Loader2 size={16} className="animate-spin mr-2" />
+                Saving...
+              </>
+            ) : (
+              savedSlug ? 'Update URL' : 'Enable Form'
+            )}
+          </button>
+          {savedSlug && (
+            <button
+              onClick={handleDisable}
+              disabled={saving}
+              className="btn btn-secondary text-red-600 hover:text-red-700"
+            >
+              Disable Form
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Live Link Card */}
+      {formUrl && (
+        <div className="card p-6 space-y-4">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">Your Form is Live</h3>
+            <p className="text-sm text-gray-500">Share this link with potential clients</p>
+          </div>
+
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={formUrl}
+              readOnly
+              className="input flex-1 font-mono text-sm bg-gray-50"
+            />
+            <button onClick={copyUrl} className="btn btn-secondary whitespace-nowrap">
+              {copied ? (
+                <><Check size={16} className="mr-1.5" /> Copied!</>
+              ) : (
+                <><Copy size={16} className="mr-1.5" /> Copy Link</>
+              )}
+            </button>
+            <a
+              href={formUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary"
+              title="Preview form"
+            >
+              <ExternalLink size={16} />
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* How It Works Card */}
+      <div className="card p-6 space-y-4">
+        <h3 className="text-base font-semibold text-gray-900">How It Works</h3>
+        <div className="space-y-3">
+          {[
+            {
+              step: '1',
+              title: 'Share your form link',
+              desc: 'Add the link to your website, email signature, social media bio, or send it directly to potential clients.',
+            },
+            {
+              step: '2',
+              title: 'Clients submit inquiries',
+              desc: 'They fill out their name, email, phone, budget, and a message describing their project.',
+            },
+            {
+              step: '3',
+              title: 'Records are created automatically',
+              desc: 'Each submission creates a new contact, a deal in your first pipeline stage, and a follow-up task due within 24 hours.',
+            },
+            {
+              step: '4',
+              title: 'Follow up and close',
+              desc: 'You get a high-priority task to follow up. Move the deal through your pipeline as the project progresses.',
+            },
+          ].map((item) => (
+            <div key={item.step} className="flex gap-3">
+              <div className="w-7 h-7 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
+                {item.step}
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-900">{item.title}</p>
+                <p className="text-sm text-gray-500">{item.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Usage Tips Card */}
+      <div className="card p-6 space-y-3">
+        <h3 className="text-base font-semibold text-gray-900">Where to Share Your Form</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+          <div className="flex items-start gap-2 p-3 bg-gray-50 rounded-lg">
+            <span className="text-lg">🌐</span>
+            <div>
+              <p className="font-medium text-gray-900">Your Website</p>
+              <p className="text-gray-500">Add a "Work With Me" or "Get a Quote" button linking to your form</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-2 p-3 bg-gray-50 rounded-lg">
+            <span className="text-lg">✉️</span>
+            <div>
+              <p className="font-medium text-gray-900">Email Signature</p>
+              <p className="text-gray-500">Include the link in your email signature for passive lead capture</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-2 p-3 bg-gray-50 rounded-lg">
+            <span className="text-lg">📱</span>
+            <div>
+              <p className="font-medium text-gray-900">Social Media</p>
+              <p className="text-gray-500">Add it to your Instagram bio, LinkedIn profile, or Twitter</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-2 p-3 bg-gray-50 rounded-lg">
+            <span className="text-lg">💬</span>
+            <div>
+              <p className="font-medium text-gray-900">Direct Messages</p>
+              <p className="text-gray-500">Send the link directly when someone asks about your services</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

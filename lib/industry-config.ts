@@ -3,7 +3,7 @@
  * Defines terminology and defaults for different Cadence vertical implementations
  */
 
-export type IndustryType = 'default' | 'photographer'
+export type IndustryType = 'default' | 'photographer' | 'service_professional'
 
 export interface IndustryConfig {
   id: IndustryType
@@ -35,6 +35,10 @@ export interface IndustryConfig {
     color: string
     is_won?: boolean
     is_lost?: boolean
+  }>
+  defaultTaskTemplates?: Array<{
+    name: string
+    description: string
   }>
 }
 
@@ -71,6 +75,14 @@ export const INDUSTRY_CONFIGS: Record<IndustryType, IndustryConfig> = {
       { name: 'Won', position: 5, color: '#10B981', is_won: true },
       { name: 'Lost', position: 6, color: '#EF4444', is_lost: true },
     ],
+    defaultTaskTemplates: [
+      { name: 'Qualify lead', description: 'Research and qualify the prospect' },
+      { name: 'Send proposal', description: 'Prepare and send proposal document' },
+      { name: 'Follow up', description: 'Follow up on proposal or last contact' },
+      { name: 'Schedule demo', description: 'Schedule product demo or meeting' },
+      { name: 'Negotiate terms', description: 'Review and negotiate deal terms' },
+      { name: 'Close deal', description: 'Finalize and close the deal' },
+    ],
   },
   photographer: {
     id: 'photographer',
@@ -105,6 +117,56 @@ export const INDUSTRY_CONFIGS: Record<IndustryType, IndustryConfig> = {
       { name: 'Paid', position: 6, color: '#06B6D4', is_won: true },
       { name: 'Declined', position: 7, color: '#EF4444', is_lost: true },
       { name: 'Cancelled', position: 8, color: '#F87171', is_lost: true },
+    ],
+    defaultTaskTemplates: [
+      { name: 'Send questionnaire', description: 'Send client questionnaire to gather shoot details' },
+      { name: 'Confirm booking details', description: 'Confirm date, time, location, and package' },
+      { name: 'Prepare for shoot', description: 'Charge gear, scout location, plan shot list' },
+      { name: 'Edit & cull photos', description: 'Cull selects and edit final gallery' },
+      { name: 'Deliver gallery', description: 'Upload and deliver final gallery to client' },
+      { name: 'Send invoice', description: 'Send final invoice and follow up on payment' },
+    ],
+  },
+  service_professional: {
+    id: 'service_professional',
+    label: 'Service Professional',
+    description: 'Freelancers, consultants, coaches & service-based professionals',
+    terminology: {
+      deals: 'Projects',
+      deal: 'Project',
+      pipeline: 'Workflow',
+      contacts: 'Clients',
+      contact: 'Client',
+      tasks: 'Tasks',
+      task: 'Task',
+      reports: 'Reports',
+      closeDate: 'Due Date',
+      dealAmount: 'Project Value',
+      activity: 'Activity',
+    },
+    features: {
+      showCompanies: false,
+      showSalesReports: false,
+      showForecast: false,
+      showConversionFunnel: false,
+      showSalesVelocity: false,
+    },
+    defaultPipelineStages: [
+      { name: 'Inquiry', position: 1, color: '#94A3B8' },
+      { name: 'Confirmed', position: 2, color: '#3B82F6' },
+      { name: 'In Progress', position: 3, color: '#F59E0B' },
+      { name: 'Review', position: 4, color: '#8B5CF6' },
+      { name: 'Delivered', position: 5, color: '#10B981', is_won: true },
+      { name: 'Paid', position: 6, color: '#06B6D4', is_won: true },
+      { name: 'Declined', position: 7, color: '#EF4444', is_lost: true },
+    ],
+    defaultTaskTemplates: [
+      { name: 'Send proposal / scope', description: 'Prepare and send initial proposal or scope document' },
+      { name: 'Confirm details', description: 'Get client sign-off on requirements and expectations' },
+      { name: 'Do work', description: 'Core execution phase' },
+      { name: 'Review / revise', description: 'Client review period and revisions if needed' },
+      { name: 'Deliver', description: 'Prepare final deliverables and hand off to client' },
+      { name: 'Invoice / follow-up', description: 'Send invoice and follow up on payment' },
     ],
   },
 }
