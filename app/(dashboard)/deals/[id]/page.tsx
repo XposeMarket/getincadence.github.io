@@ -7,13 +7,14 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
   ArrowLeft, DollarSign, Calendar, Building2, Edit2, Trash2, 
-  Plus, CheckSquare, MessageSquare, Clock, X, UserCircle
+  Plus, CheckSquare, MessageSquare, Clock, X, UserCircle, MapPin, Users, Camera
 } from 'lucide-react'
 import { formatActivityTime, formatFullTimestamp } from '@/lib/date-utils'
 import CreateTaskModal from '@/components/tasks/CreateTaskModal'
 import { ActivityLogger } from '@/lib/activity-logger'
 import { getSuggestedTasksForStage, SuggestedTask } from '@/lib/automation-engine'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
+import { useIndustry } from '@/lib/contexts/IndustryContext'
 
 interface PipelineStage {
   id: string
@@ -46,6 +47,15 @@ interface Deal {
   created_at: string
   contacts: { id: string; first_name: string; last_name: string; email: string | null }[] | { id: string; first_name: string; last_name: string; email: string | null } | null
   companies: { id: string; name: string }[] | { id: string; name: string } | null
+  // Photographer fields
+  booking_type: 'personal' | 'event' | null
+  num_people: number | null
+  event_date: string | null
+  event_start_time: string | null
+  event_end_time: string | null
+  location_type: 'provided' | 'flexible' | null
+  location: string | null
+  special_requests: string | null
 }
 
 interface Task {
@@ -88,6 +98,8 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
   const [orgId, setOrgId] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
+  const { terminology, config } = useIndustry()
+  const isPhotographer = config.id === 'photographer'
 
   useEffect(() => {
     const initOrg = async () => {
@@ -115,7 +127,7 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
       .single()
 
     if (dealRes.data) {
-      setDeal(dealRes.data)
+      setDeal(dealRes.data as Deal)
       const [stagesRes, tasksRes, activitiesRes] = await Promise.all([
         supabase.from('pipeline_stages').select('*').eq('pipeline_id', dealRes.data.pipeline_id).order('position'),
         supabase.from('tasks').select('id, title, status, due_date').eq('deal_id', params.id).neq('status', 'completed'),
@@ -221,8 +233,8 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
   if (!deal) {
     return (
       <div className="text-center py-12">
-        <h2 className="text-xl font-semibold text-gray-900">Deal not found</h2>
-        <Link href="/deals" className="text-primary-600 mt-2 inline-block">Back to deals</Link>
+        <h2 className="text-xl font-semibold text-gray-900">{terminology.deal} not found</h2>
+        <Link href="/deals" className="text-primary-600 mt-2 inline-block">Back to {terminology.deals.toLowerCase()}</Link>
       </div>
     )
   }
@@ -233,35 +245,59 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
   const company = getFirst(deal.companies)
   const contact = getFirst(deal.contacts)
 
+  // Format time for display (HH:MM:SS -> HH:MM AM/PM)
+  const formatTime = (time: string | null) => {
+    if (!time) return null
+    try {
+      const [hours, minutes] = time.split(':')
+      const h = parseInt(hours)
+      const ampm = h >= 12 ? 'PM' : 'AM'
+      const h12 = h % 12 || 12
+      return `${h12}:${minutes} ${ampm}`
+    } catch {
+      return time
+    }
+  }
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/deals" className="btn btn-ghost p-2"><ArrowLeft size={20} /></Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold text-gray-900">{deal.name}</h1>
-          <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header - Mobile responsive */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+        <Link href="/deals" className="btn btn-ghost p-2 self-start"><ArrowLeft size={20} /></Link>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{deal.name}</h1>
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-1 text-sm text-gray-500">
             {dealAmount > 0 && <span className="font-medium text-gray-900">${dealAmount.toLocaleString()}</span>}
-            {company && (
+            {!isPhotographer && company && (
               <>
-                <span>·</span>
+                <span className="hidden sm:inline">·</span>
                 <Link href={`/companies/${company.id}`} className="hover:text-primary-600">
                   {company.name}
                 </Link>
               </>
             )}
+            {isPhotographer && deal.booking_type && (
+              <>
+                <span className="hidden sm:inline">·</span>
+                <span className="capitalize">{deal.booking_type} shoot</span>
+              </>
+            )}
           </div>
         </div>
-        <button onClick={() => setShowEditModal(true)} className="btn btn-secondary">
-          <Edit2 size={16} className="mr-2" />Edit
-        </button>
-        <button onClick={handleDelete} className="btn btn-ghost text-red-600 hover:bg-red-50">
-          <Trash2 size={16} />
-        </button>
+        <div className="flex gap-2 self-start sm:self-center">
+          <button onClick={() => setShowEditModal(true)} className="btn btn-secondary">
+            <Edit2 size={16} className="sm:mr-2" />
+            <span className="hidden sm:inline">Edit</span>
+          </button>
+          <button onClick={handleDelete} className="btn btn-ghost text-red-600 hover:bg-red-50">
+            <Trash2 size={16} />
+          </button>
+        </div>
       </div>
 
-      {/* Pipeline stages */}
-      <div className="card p-4">
-        <div className="flex items-center gap-1">
+      {/* Pipeline stages - horizontally scrollable on mobile */}
+      <div className="card p-3 sm:p-4 overflow-x-auto">
+        <div className="flex items-center gap-1 min-w-max sm:min-w-0">
           {stages.map((stage, idx) => {
             const isActive = stage.id === deal.stage_id
             const isPast = stages.findIndex(s => s.id === deal.stage_id) > idx
@@ -269,7 +305,7 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
               <button
                 key={stage.id}
                 onClick={() => handleStageClick(stage.id, stage.name)}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
+                className={`flex-1 flex items-center justify-center gap-2 py-2 px-2 sm:px-3 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
                   isActive ? 'text-white' : isPast ? 'bg-gray-100 text-gray-600' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
                 }`}
                 style={isActive ? { backgroundColor: stage.color } : {}}
@@ -281,17 +317,20 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
-        <div className="col-span-2 space-y-6">
-          <div className="flex gap-3">
-            <button onClick={() => setShowTaskModal(true)} className="btn btn-secondary">
-              <Plus size={16} className="mr-2" />Add Task
+      {/* Main content - responsive grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+        {/* Left column - Activity */}
+        <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+          <div className="flex flex-wrap gap-2 sm:gap-3">
+            <button onClick={() => setShowTaskModal(true)} className="btn btn-secondary text-sm">
+              <Plus size={16} className="mr-1 sm:mr-2" />Add {terminology.task}
             </button>
           </div>
 
-          <div className="card p-4">
+          {/* Note input */}
+          <div className="card p-3 sm:p-4">
             <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+              <div className="hidden sm:flex w-8 h-8 rounded-full bg-gray-200 items-center justify-center shrink-0">
                 <MessageSquare size={16} className="text-gray-600" />
               </div>
               <div className="flex-1">
@@ -300,11 +339,11 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
                   onChange={(e) => setNewNote(e.target.value)} 
                   placeholder="Add a note..." 
                   rows={2} 
-                  className="input resize-none" 
+                  className="input resize-none text-sm" 
                 />
                 {newNote.trim() && (
                   <div className="mt-2 flex justify-end">
-                    <button onClick={handleAddNote} disabled={savingNote} className="btn btn-primary">
+                    <button onClick={handleAddNote} disabled={savingNote} className="btn btn-primary text-sm">
                       {savingNote ? 'Saving...' : 'Add Note'}
                     </button>
                   </div>
@@ -313,14 +352,15 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
             </div>
           </div>
 
+          {/* Activity feed */}
           <div className="card">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="font-semibold text-gray-900">Activity</h2>
+            <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200">
+              <h2 className="font-semibold text-gray-900">{terminology.activity}</h2>
             </div>
             {activities.length > 0 ? (
               <div className="divide-y divide-gray-100">
                 {activities.map(activity => (
-                  <div key={activity.id} className="p-4">
+                  <div key={activity.id} className="p-3 sm:p-4">
                     <p className="text-sm text-gray-900">
                       {activity.subject}
                     </p>
@@ -339,14 +379,70 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
                 ))}
               </div>
             ) : (
-              <div className="p-6 text-center text-gray-500">No activity yet</div>
+              <div className="p-4 sm:p-6 text-center text-gray-500 text-sm">No activity yet</div>
             )}
           </div>
         </div>
 
-        <div className="space-y-6">
-          <div className="card p-6">
-            <h3 className="font-semibold mb-4 text-gray-900">Deal Info</h3>
+        {/* Right column - Info cards */}
+        <div className="space-y-4 sm:space-y-6">
+          {/* Photographer: Booking Details */}
+          {isPhotographer && (deal.event_date || deal.location || deal.booking_type) && (
+            <div className="card p-4 sm:p-6">
+              <h3 className="font-semibold mb-4 text-gray-900 flex items-center gap-2">
+                <Camera size={16} className="text-gray-400" />
+                Booking Details
+              </h3>
+              <div className="space-y-3 text-sm">
+                {deal.booking_type && (
+                  <div className="flex items-start gap-3">
+                    <Users size={16} className="text-gray-400 mt-0.5" />
+                    <div>
+                      <span className="text-gray-600 capitalize">{deal.booking_type} shoot</span>
+                      {deal.booking_type === 'event' && deal.num_people && (
+                        <span className="text-gray-500 ml-1">({deal.num_people} people)</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {deal.event_date && (
+                  <div className="flex items-start gap-3">
+                    <Calendar size={16} className="text-gray-400 mt-0.5" />
+                    <div>
+                      <p className="text-gray-600">{new Date(deal.event_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                      {(deal.event_start_time || deal.event_end_time) && (
+                        <p className="text-gray-500 text-xs mt-0.5">
+                          {formatTime(deal.event_start_time)} {deal.event_end_time && `- ${formatTime(deal.event_end_time)}`}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {(deal.location || deal.location_type) && (
+                  <div className="flex items-start gap-3">
+                    <MapPin size={16} className="text-gray-400 mt-0.5" />
+                    <div>
+                      {deal.location ? (
+                        <p className="text-gray-600">{deal.location}</p>
+                      ) : deal.location_type === 'flexible' ? (
+                        <p className="text-gray-500 italic">Location TBD</p>
+                      ) : null}
+                    </div>
+                  </div>
+                )}
+                {deal.special_requests && (
+                  <div className="pt-2 mt-2 border-t border-gray-100">
+                    <p className="text-xs text-gray-500 mb-1">Special Requests</p>
+                    <p className="text-gray-600 text-sm">{deal.special_requests}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Deal/Booking Info */}
+          <div className="card p-4 sm:p-6">
+            <h3 className="font-semibold mb-4 text-gray-900">{terminology.deal} Info</h3>
             <div className="space-y-3 text-sm">
               <div className="flex items-center gap-3">
                 <DollarSign size={16} className="text-gray-400" />
@@ -354,39 +450,37 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
               </div>
               {currentStage && (
                 <div className="flex items-center gap-3">
-                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: currentStage.color }} />
+                  <div className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: currentStage.color }} />
                   <span className="text-gray-600">{currentStage.name}</span>
                 </div>
               )}
-              {deal.close_date && (
+              {!isPhotographer && deal.close_date && (
                 <div className="flex items-center gap-3">
                   <Calendar size={16} className="text-gray-400" />
-                  <span className="text-gray-600">Close: {new Date(deal.close_date).toLocaleDateString()}</span>
+                  <span className="text-gray-600">{terminology.closeDate}: {new Date(deal.close_date).toLocaleDateString()}</span>
                 </div>
               )}
               <div className="flex items-center gap-3">
                 <Clock size={16} className="text-gray-400" />
-                <span className="text-gray-500">{formatFullTimestamp(deal.created_at)}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <UserCircle size={16} className="text-gray-400" />
-                <span className="text-gray-500">Created by Demo User</span>
+                <span className="text-gray-500 text-xs">{formatFullTimestamp(deal.created_at)}</span>
               </div>
             </div>
           </div>
 
+          {/* Contact / Client */}
           {contact && (
-            <div className="card p-6">
-              <h3 className="font-semibold mb-4 text-gray-900">Contact</h3>
+            <div className="card p-4 sm:p-6">
+              <h3 className="font-semibold mb-4 text-gray-900">{terminology.contact}</h3>
               <Link href={`/contacts/${contact.id}`} className="block p-3 bg-gray-50 rounded-lg hover:bg-gray-100">
                 <p className="font-medium text-gray-900">{contact.first_name} {contact.last_name}</p>
-                {contact.email && <p className="text-xs text-gray-500">{contact.email}</p>}
+                {contact.email && <p className="text-xs text-gray-500 truncate">{contact.email}</p>}
               </Link>
             </div>
           )}
 
-          {company && (
-            <div className="card p-6">
+          {/* Company - only for non-photographer */}
+          {!isPhotographer && company && (
+            <div className="card p-4 sm:p-6">
               <h3 className="font-semibold mb-4 text-gray-900">Company</h3>
               <Link href={`/companies/${company.id}`} className="block p-3 bg-gray-50 rounded-lg hover:bg-gray-100">
                 <div className="flex items-center gap-3">
@@ -397,17 +491,18 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
             </div>
           )}
 
-          <div className="card p-6">
+          {/* Open Tasks */}
+          <div className="card p-4 sm:p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-gray-900">Open Tasks</h3>
+              <h3 className="font-semibold text-gray-900">Open {terminology.tasks}</h3>
               <span className="text-sm text-gray-500">{tasks.length}</span>
             </div>
             {tasks.length > 0 ? (
               <div className="space-y-2">
                 {tasks.map(t => (
                   <div key={t.id} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
-                    <CheckSquare size={16} className="text-gray-400" />
-                    <div className="flex-1">
+                    <CheckSquare size={16} className="text-gray-400 shrink-0" />
+                    <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate text-gray-900">{t.title}</p>
                       {t.due_date && <p className="text-xs text-gray-500">Due {new Date(t.due_date).toLocaleDateString()}</p>}
                     </div>
@@ -415,7 +510,7 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-gray-500">No open tasks</p>
+              <p className="text-sm text-gray-500">No open {terminology.tasks.toLowerCase()}</p>
             )}
 
             {/* Suggested Tasks */}
@@ -427,7 +522,7 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
                     className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
                   >
                     <Plus size={14} />
-                    Suggested tasks for {currentStage.name}
+                    Suggested {terminology.tasks.toLowerCase()} for {currentStage.name}
                   </button>
                   
                   {showSuggestedTasks && (
@@ -478,17 +573,17 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
       {stageConfirmation && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md animate-slide-up">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Change Deal Stage</h2>
+            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Change {terminology.deal} Stage</h2>
               <button onClick={() => setStageConfirmation(null)} className="text-gray-400 hover:text-gray-600">
                 <X size={20} />
               </button>
             </div>
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               <p className="text-gray-600">
                 Are you sure you want to move <strong>{deal.name}</strong> to <strong>{stageConfirmation.stageName}</strong>?
               </p>
-              <div className="flex justify-end gap-3 mt-6">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 mt-6">
                 <button onClick={() => setStageConfirmation(null)} className="btn btn-secondary">Cancel</button>
                 <button onClick={confirmStageChange} className="btn btn-primary">Confirm</button>
               </div>
@@ -510,6 +605,9 @@ interface EditDealModalProps {
 }
 
 function EditDealModal({ deal, stages, contacts, companies, onClose, onSaved }: EditDealModalProps) {
+  const { terminology, config } = useIndustry()
+  const isPhotographer = config.type === 'photographer'
+  
   const [name, setName] = useState(deal.name)
   const [amount, setAmount] = useState(deal.amount?.toString() || '')
   const [stageId, setStageId] = useState(deal.stage_id)
@@ -517,6 +615,17 @@ function EditDealModal({ deal, stages, contacts, companies, onClose, onSaved }: 
   const [companyId, setCompanyId] = useState(deal.company_id || '')
   const [closeDate, setCloseDate] = useState(deal.close_date || '')
   const [description, setDescription] = useState(deal.description || '')
+  
+  // Photographer-specific fields
+  const [bookingType, setBookingType] = useState(deal.booking_type || 'personal')
+  const [numPeople, setNumPeople] = useState(deal.num_people?.toString() || '')
+  const [eventDate, setEventDate] = useState(deal.event_date || '')
+  const [eventStartTime, setEventStartTime] = useState(deal.event_start_time || '')
+  const [eventEndTime, setEventEndTime] = useState(deal.event_end_time || '')
+  const [locationType, setLocationType] = useState(deal.location_type || 'client')
+  const [location, setLocation] = useState(deal.location || '')
+  const [specialRequests, setSpecialRequests] = useState(deal.special_requests || '')
+  
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const supabase = createClient()
@@ -526,17 +635,31 @@ function EditDealModal({ deal, stages, contacts, companies, onClose, onSaved }: 
     setLoading(true)
     setError(null)
 
+    const updateData: Record<string, unknown> = {
+      name,
+      amount: amount ? parseFloat(amount) : null,
+      stage_id: stageId,
+      contact_id: contactId || null,
+      company_id: companyId || null,
+      close_date: closeDate || null,
+      description: description || null
+    }
+
+    // Add photographer fields if applicable
+    if (isPhotographer) {
+      updateData.booking_type = bookingType
+      updateData.num_people = numPeople ? parseInt(numPeople) : null
+      updateData.event_date = eventDate || null
+      updateData.event_start_time = eventStartTime || null
+      updateData.event_end_time = eventEndTime || null
+      updateData.location_type = locationType
+      updateData.location = location || null
+      updateData.special_requests = specialRequests || null
+    }
+
     const { error: updateError } = await supabase
       .from('deals')
-      .update({
-        name,
-        amount: amount ? parseFloat(amount) : null,
-        stage_id: stageId,
-        contact_id: contactId || null,
-        company_id: companyId || null,
-        close_date: closeDate || null,
-        description: description || null
-      })
+      .update(updateData)
       .eq('id', deal.id)
 
     if (updateError) {
@@ -551,14 +674,14 @@ function EditDealModal({ deal, stages, contacts, companies, onClose, onSaved }: 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-slide-up">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white">
-          <h2 className="text-lg font-semibold text-gray-900">Edit Deal</h2>
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-200 sticky top-0 bg-white">
+          <h2 className="text-lg font-semibold text-gray-900">Edit {terminology.deal}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
           {error && (
             <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg">
               {error}
@@ -566,7 +689,7 @@ function EditDealModal({ deal, stages, contacts, companies, onClose, onSaved }: 
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Deal Name *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">{terminology.deal} Name *</label>
             <input
               type="text"
               value={name}
@@ -576,7 +699,7 @@ function EditDealModal({ deal, stages, contacts, companies, onClose, onSaved }: 
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Value</label>
               <div className="relative">
@@ -601,9 +724,9 @@ function EditDealModal({ deal, stages, contacts, companies, onClose, onSaved }: 
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className={`grid gap-4 ${isPhotographer ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Contact</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{terminology.contact}</label>
               <select value={contactId} onChange={(e) => setContactId(e.target.value)} className="input">
                 <option value="">None</option>
                 {contacts.map(c => (
@@ -611,39 +734,148 @@ function EditDealModal({ deal, stages, contacts, companies, onClose, onSaved }: 
                 ))}
               </select>
             </div>
+            {!isPhotographer && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">{terminology.company}</label>
+                <select value={companyId} onChange={(e) => setCompanyId(e.target.value)} className="input">
+                  <option value="">None</option>
+                  {companies.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          {/* Photographer-specific fields */}
+          {isPhotographer && (
+            <>
+              <div className="border-t border-gray-200 pt-4">
+                <h3 className="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
+                  <Camera size={16} className="text-primary-600" />
+                  Session Details
+                </h3>
+                
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Booking Type</label>
+                      <select value={bookingType} onChange={(e) => setBookingType(e.target.value)} className="input">
+                        <option value="personal">Personal Shoot</option>
+                        <option value="event">Event Coverage</option>
+                        <option value="commercial">Commercial/Business</option>
+                        <option value="wedding">Wedding</option>
+                        <option value="portrait">Portrait Session</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Number of People</label>
+                      <input
+                        type="number"
+                        value={numPeople}
+                        onChange={(e) => setNumPeople(e.target.value)}
+                        min="1"
+                        className="input"
+                        placeholder="e.g., 2"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Event Date</label>
+                    <input
+                      type="date"
+                      value={eventDate}
+                      onChange={(e) => setEventDate(e.target.value)}
+                      className="input"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Start Time</label>
+                      <input
+                        type="time"
+                        value={eventStartTime}
+                        onChange={(e) => setEventStartTime(e.target.value)}
+                        className="input"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">End Time</label>
+                      <input
+                        type="time"
+                        value={eventEndTime}
+                        onChange={(e) => setEventEndTime(e.target.value)}
+                        className="input"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Location Type</label>
+                    <select value={locationType} onChange={(e) => setLocationType(e.target.value)} className="input">
+                      <option value="client">Client&apos;s Location</option>
+                      <option value="studio">My Studio</option>
+                      <option value="outdoor">Outdoor Location</option>
+                      <option value="venue">Event Venue</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Location Address</label>
+                    <input
+                      type="text"
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      className="input"
+                      placeholder="Full address or location name"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Special Requests</label>
+                    <textarea
+                      value={specialRequests}
+                      onChange={(e) => setSpecialRequests(e.target.value)}
+                      rows={2}
+                      className="input resize-none"
+                      placeholder="Any special requirements or requests..."
+                    />
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {!isPhotographer && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Company</label>
-              <select value={companyId} onChange={(e) => setCompanyId(e.target.value)} className="input">
-                <option value="">None</option>
-                {companies.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Expected Close Date</label>
+              <input
+                type="date"
+                value={closeDate}
+                onChange={(e) => setCloseDate(e.target.value)}
+                className="input"
+              />
             </div>
-          </div>
+          )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Expected Close Date</label>
-            <input
-              type="date"
-              value={closeDate}
-              onChange={(e) => setCloseDate(e.target.value)}
-              className="input"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Description</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              {isPhotographer ? 'Notes' : 'Description'}
+            </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               className="input resize-none"
-              placeholder="Add notes about this deal..."
+              placeholder={isPhotographer ? 'Add notes about this booking...' : 'Add notes about this deal...'}
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
             <button type="button" onClick={onClose} className="btn btn-secondary">Cancel</button>
             <button type="submit" disabled={loading} className="btn btn-primary">
               {loading ? 'Saving...' : 'Save Changes'}
