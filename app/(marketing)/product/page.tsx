@@ -1,6 +1,8 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
+import { useState } from 'react'
 import { 
   LayoutDashboard, Users, Building2, Handshake, CheckSquare, 
   Calendar, BarChart3, Zap, Bell, Search, Filter, ArrowRight,
@@ -74,6 +76,8 @@ const highlights = [
 ]
 
 export default function ProductPage() {
+  const [modalOpen, setModalOpen] = useState(false)
+
   return (
     <>
       {/* Hero */}
@@ -160,12 +164,18 @@ export default function ProductPage() {
             </div>
 
             <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-lg">
-              <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-50 rounded-xl flex items-center justify-center text-gray-400">
-                <div className="text-center">
-                  <LayoutDashboard size={48} className="mx-auto text-gray-300" />
-                  <p className="text-sm mt-2">Product screenshot</p>
-                </div>
-              </div>
+              <button
+                onClick={() => setModalOpen(true)}
+                className="w-full aspect-video bg-white rounded-xl overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+              >
+                <Image
+                  src="/dashboard/dashboard.png"
+                  alt="Dashboard preview"
+                  width={1920}
+                  height={1080}
+                  className="w-full h-full object-cover"
+                />
+              </button>
             </div>
           </div>
         </div>
@@ -221,6 +231,34 @@ export default function ProductPage() {
           </div>
         </div>
       </section>
+
+      {/* Image Modal */}
+      {modalOpen && (
+        <div
+          onClick={() => setModalOpen(false)}
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+        >
+          <button
+            onClick={() => setModalOpen(false)}
+            className="absolute top-4 right-4 w-10 h-10 rounded-lg bg-white/90 hover:bg-white flex items-center justify-center text-gray-600 hover:text-gray-900 transition-all shadow-lg"
+            aria-label="Close modal"
+          >
+            ✕
+          </button>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-5xl aspect-[16/10] rounded-2xl overflow-hidden shadow-2xl"
+          >
+            <Image
+              src="/dashboard/dashboard.png"
+              alt="Full dashboard"
+              fill
+              className="object-contain"
+              priority
+            />
+          </div>
+        </div>
+      )}
     </>
   )
 }

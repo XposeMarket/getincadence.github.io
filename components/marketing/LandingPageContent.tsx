@@ -6,10 +6,10 @@ import { useState, useEffect, useRef } from 'react'
 import { Check, RefreshCw, LayoutDashboard, MessageSquare, Zap } from 'lucide-react'
 
 const screenshots = [
-  { key: 'dash', label: 'Dashboard', src: '/screenshots/dashboard.png' },
-  { key: 'planner', label: 'Planner', src: '/screenshots/planner.png' },
-  { key: 'deals', label: 'Deals', src: '/screenshots/deals.png' },
-  { key: 'detail', label: 'Deal detail', src: '/screenshots/deal-detail.png' },
+  { key: 'dash', label: 'Dashboard', src: '/dashboard/dashboard.png' },
+  { key: 'planner', label: 'Planner', src: '/dashboard/planner.png' },
+  { key: 'deals', label: 'Deals', src: '/dashboard/deals.png' },
+  { key: 'detail', label: 'Deal detail', src: '/dashboard/deals-details.png' },
 ]
 
 export default function LandingPageContent() {
@@ -17,6 +17,8 @@ export default function LandingPageContent() {
   const [imagesLoaded, setImagesLoaded] = useState(false)
   const autoRotateRef = useRef<NodeJS.Timeout | null>(null)
   const [autoRotate, setAutoRotate] = useState(true)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [modalSrc, setModalSrc] = useState('')
 
   // Auto-rotate screenshots
   useEffect(() => {
@@ -133,25 +135,26 @@ export default function LandingPageContent() {
               {/* Screenshot area */}
               <div className="relative aspect-[16/10] bg-gradient-to-b from-gray-50/65 to-gray-50/25 p-3.5">
                 {screenshots.map((shot) => (
-                  <div
+                  <button
                     key={shot.key}
-                    className={`absolute inset-3.5 rounded-xl border border-gray-200 overflow-hidden bg-white shadow-lg transition-all duration-300 ${
+                    onClick={() => {
+                      setModalOpen(true)
+                      setModalSrc(shot.src)
+                    }}
+                    className={`absolute inset-3.5 rounded-xl border border-gray-200 overflow-hidden bg-white shadow-lg transition-all duration-300 cursor-pointer hover:shadow-xl hover:border-gray-300 ${
                       activeTab === shot.key
                         ? 'opacity-100 translate-y-0 scale-100'
                         : 'opacity-0 translate-y-2 scale-[0.99] pointer-events-none'
                     }`}
                   >
-                    {/* Placeholder for screenshots - replace with actual images */}
-                    <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center text-gray-400 text-sm">
-                      <div className="text-center p-6">
-                        <div className="w-16 h-16 mx-auto mb-3 rounded-xl bg-gray-200 flex items-center justify-center">
-                          <LayoutDashboard size={32} className="text-gray-400" />
-                        </div>
-                        <p className="font-medium text-gray-500">{shot.label} Screenshot</p>
-                        <p className="text-xs text-gray-400 mt-1">Add image at /public{shot.src}</p>
-                      </div>
-                    </div>
-                  </div>
+                    <Image
+                      src={shot.src}
+                      alt={shot.label}
+                      fill
+                      className="object-cover"
+                      priority={activeTab === shot.key}
+                    />
+                  </button>
                 ))}
               </div>
             </div>
@@ -460,6 +463,34 @@ export default function LandingPageContent() {
           </div>
         </div>
       </section>
+
+      {/* Image Modal */}
+      {modalOpen && (
+        <div
+          onClick={() => setModalOpen(false)}
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+        >
+          <button
+            onClick={() => setModalOpen(false)}
+            className="absolute top-4 right-4 w-10 h-10 rounded-lg bg-white/90 hover:bg-white flex items-center justify-center text-gray-600 hover:text-gray-900 transition-all shadow-lg"
+            aria-label="Close modal"
+          >
+            ✕
+          </button>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-5xl aspect-[16/10] rounded-2xl overflow-hidden shadow-2xl"
+          >
+            <Image
+              src={modalSrc}
+              alt="Full screenshot"
+              fill
+              className="object-contain"
+              priority
+            />
+          </div>
+        </div>
+      )}
     </>
   )
 }
