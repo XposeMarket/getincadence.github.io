@@ -15,6 +15,7 @@ export const FREE_TIER_LIMITS = {
   intakeForms: 1,
   monthlySubmissions: 25,
   historyDays: 30, // Days of visible activity history
+  customAutomations: 1, // User-created automations (presets don't count)
 } as const
 
 // Statuses that count as "closed" (not active) — case-insensitive
@@ -116,5 +117,10 @@ export const LIMIT_MESSAGES: Record<keyof typeof FREE_TIER_LIMITS, {
     title: 'History limited to 30 days',
     description: 'Your full history is safely stored. Upgrade to view all past activity and unlock reporting trends.',
     upgradeText: 'Upgrade for full history',
+  },
+  customAutomations: {
+    title: 'Custom automation limit reached',
+    description: `The free plan includes ${FREE_TIER_LIMITS.customAutomations} custom automation. Presets are always available — upgrade to create more custom automations.`,
+    upgradeText: 'Upgrade for more automations',
   },
 }

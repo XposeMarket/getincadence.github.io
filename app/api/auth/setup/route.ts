@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { getIndustryConfig, IndustryType } from '@/lib/industry-config'
+import { buildSeedRows } from '@/lib/automation-presets'
 
 export async function POST(request: NextRequest) {
   try {
@@ -119,6 +120,21 @@ export async function POST(request: NextRequest) {
         }))
       )
       console.log(`Created ${defaultStages.length} pipeline stages for ${industryConfig.id} industry`)
+    }
+
+    // Seed default automations for this industry
+    console.log('Seeding default automations...')
+    const automationRows = buildSeedRows(org.id, industryType || 'default')
+    if (automationRows.length > 0) {
+      const { error: autoError } = await supabase
+        .from('automations')
+        .insert(automationRows)
+      if (autoError) {
+        console.error('Automation seeding error:', autoError)
+        // Non-critical — continue
+      } else {
+        console.log(`Seeded ${automationRows.length} default automations`)
+      }
     }
 
     return NextResponse.json({ success: true, orgId: org.id })

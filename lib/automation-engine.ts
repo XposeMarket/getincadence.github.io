@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUserOrgId } from '@/lib/org-helpers'
 import { format, addDays, addHours } from 'date-fns'
+import type { AutomationAction } from '@/lib/automation-presets'
 
 // ============================================
 // TYPES
@@ -41,92 +42,14 @@ export interface TaskTemplate {
   priority: 'low' | 'normal' | 'high'
 }
 
-// ============================================
-// TASK TEMPLATES
-// ============================================
-
-export const TASK_TEMPLATES = {
-  // Contact created → First touch task
-  firstTouch: {
-    titleTemplate: 'Reach out to {{contactName}}',
-    descriptionTemplate: 'New contact created. Send intro message and confirm next steps.',
-    dueDays: 1,
-    priority: 'high' as const
-  },
-
-  // Deal created → Qualify task (varies by stage)
-  qualifyDeal: {
-    titleTemplate: 'Qualify deal: {{dealName}}',
-    descriptionTemplate: '• Confirm decision maker\n• Confirm timeline\n• Confirm budget\n• Set expected close date\n• Log initial notes',
-    dueDays: 1,
-    priority: 'high' as const
-  },
-
-  // Deal → Proposal stage
-  proposalFollowUp: {
-    titleTemplate: 'Follow up on proposal: {{dealName}}',
-    descriptionTemplate: 'Ask if they had a chance to review the proposal. Address any questions. Offer a quick call to discuss.',
-    dueDays: 2,
-    priority: 'high' as const
-  },
-
-  // Deal → Negotiation stage
-  negotiationFollowUp: {
-    titleTemplate: 'Resolve blockers: {{dealName}}',
-    descriptionTemplate: 'Identify and address any remaining concerns or objections. Confirm decision timeline.',
-    dueDays: 2,
-    priority: 'high' as const
-  },
-
-  // Deal idle 7 days
-  reengageDeal: {
-    titleTemplate: 'Re-engage: {{dealName}} (inactive 7 days)',
-    descriptionTemplate: 'This deal has had no activity for 7 days. Send a check-in message and propose next steps.',
-    dueDays: 0,
-    priority: 'high' as const
-  },
-
-  // Deal Won → Onboarding tasks
-  onboarding: {
-    welcome: {
-      titleTemplate: 'Send welcome email: {{dealName}}',
-      descriptionTemplate: 'Send welcome/congratulations email to the client with next steps.',
-      dueDays: 0,
-      priority: 'high' as const
-    },
-    collectRequirements: {
-      titleTemplate: 'Collect requirements: {{dealName}}',
-      descriptionTemplate: 'Gather all necessary information and requirements from the client.',
-      dueDays: 2,
-      priority: 'normal' as const
-    },
-    kickoffCall: {
-      titleTemplate: 'Schedule kickoff call: {{dealName}}',
-      descriptionTemplate: 'Schedule and prepare for the project kickoff meeting.',
-      dueDays: 2,
-      priority: 'high' as const
-    },
-    projectSetup: {
-      titleTemplate: 'Create project folder & docs: {{dealName}}',
-      descriptionTemplate: 'Set up project folder, documentation, and any necessary tools.',
-      dueDays: 3,
-      priority: 'normal' as const
-    },
-    billingConfirm: {
-      titleTemplate: 'Confirm billing & contract: {{dealName}}',
-      descriptionTemplate: 'Verify contract is signed and billing/payment details are in order.',
-      dueDays: 1,
-      priority: 'high' as const
-    }
-  },
-
-  // Deal Lost → Revisit reminder
-  revisitLostDeal: {
-    titleTemplate: 'Revisit lost deal: {{dealName}}',
-    descriptionTemplate: 'Check in to see if circumstances have changed. Timing may be better now.',
-    dueDays: 60,
-    priority: 'low' as const
-  }
+interface DBAutomation {
+  id: string
+  name: string
+  trigger_type: string
+  trigger_config: Record<string, any>
+  conditions: Array<{ field: string; value: any }>
+  actions: AutomationAction[]
+  is_active: boolean
 }
 
 // ============================================
@@ -159,77 +82,189 @@ function calculateDueDate(dueDays: number, dueHours?: number): string {
 }
 
 // ============================================
+// DB QUERY: Find matching active automations
+// ============================================
+
+async function getActiveAutomations(
+  orgId: string,
+  triggerType: string
+): Promise<DBAutomation[]> {
+  const supabase = createClient()
+  
+  const { data, error } = await supabase
+    .from('automations')
+    .select('id, name, trigger_type, trigger_config, conditions, actions, is_active')
+    .eq('org_id', orgId)
+    .eq('trigger_type', triggerType)
+    .eq('is_active', true)
+
+  if (error) {
+    console.warn('Failed to query automations table:', error)
+    return []
+  }
+  
+  return (data || []) as DBAutomation[]
+}
+
+/** Check if a stage-change automation matches the new stage */
+function matchesStageChange(
+  triggerConfig: Record<string, any>,
+  newStageName: string,
+  stageIsWon: boolean,
+  stageIsLost: boolean
+): boolean {
+  // Match by is_won / is_lost flag
+  if (triggerConfig.is_won === true && stageIsWon) return true
+  if (triggerConfig.is_lost === true && stageIsLost) return true
+
+  // Match by stage name substring
+  if (triggerConfig.to_stage_contains) {
+    const target = triggerConfig.to_stage_contains.toLowerCase()
+    const actual = newStageName.toLowerCase()
+    if (actual.includes(target)) return true
+  }
+
+  // If no specific stage filter, match any stage change
+  if (!triggerConfig.to_stage_contains && !triggerConfig.is_won && !triggerConfig.is_lost) {
+    return true
+  }
+
+  return false
+}
+
+/** Evaluate user-defined conditions against the automation context */
+function matchesConditions(
+  conditions: Array<{ field: string; value: any }>,
+  context: AutomationContext
+): boolean {
+  if (!conditions || conditions.length === 0) return true
+
+  for (const cond of conditions) {
+    switch (cond.field) {
+      case 'stage_is':
+        if (context.newStageName?.toLowerCase() !== String(cond.value).toLowerCase() &&
+            context.stageName?.toLowerCase() !== String(cond.value).toLowerCase()) {
+          return false
+        }
+        break
+      case 'stage_is_not':
+        if (context.newStageName?.toLowerCase() === String(cond.value).toLowerCase() ||
+            context.stageName?.toLowerCase() === String(cond.value).toLowerCase()) {
+          return false
+        }
+        break
+      case 'value_greater_than':
+        if (!context.dealAmount || context.dealAmount <= Number(cond.value)) return false
+        break
+      case 'value_less_than':
+        if (!context.dealAmount || context.dealAmount >= Number(cond.value)) return false
+        break
+      case 'priority_is':
+        // Priority conditions would need priority in context — skip for now
+        break
+      case 'owner_is':
+        // Owner conditions would need owner_id in context — skip for now
+        break
+    }
+  }
+  return true
+}
+
+/** Deduplication: prevent the same automation from firing on the same entity within 5 minutes */
+async function isDuplicate(
+  automationId: string,
+  entityId: string | undefined,
+  orgId: string
+): Promise<boolean> {
+  if (!entityId) return false
+
+  const supabase = createClient()
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+
+  const { data } = await supabase
+    .from('automation_logs')
+    .select('id')
+    .eq('automation_type', automationId)
+    .eq('trigger_entity_id', entityId)
+    .eq('org_id', orgId)
+    .gte('created_at', fiveMinutesAgo)
+    .limit(1)
+
+  return (data?.length || 0) > 0
+}
+
+// ============================================
 // AUTOMATION ACTIONS
 // ============================================
 
-export async function createAutomatedTask(
-  template: TaskTemplate,
+async function executeActions(
+  actions: AutomationAction[],
   context: AutomationContext,
-  automationSource: string
-): Promise<{ success: boolean; taskId?: string; error?: string }> {
+  automationId: string,
+  automationName: string,
+  orgId: string
+): Promise<{ tasksCreated: number }> {
   const supabase = createClient()
-  
-  // Get the org_id for the current user
-  const orgId = await getCurrentUserOrgId()
-  if (!orgId) {
-    console.error('Failed to get org_id for automated task')
-    return { success: false, error: 'Unable to determine organization' }
-  }
-  
-  const title = interpolateTemplate(template.titleTemplate, context)
-  const description = template.descriptionTemplate 
-    ? interpolateTemplate(template.descriptionTemplate, context)
-    : null
-  const dueDate = calculateDueDate(template.dueDays, template.dueHours)
-  
-  const { data, error } = await supabase
-    .from('tasks')
-    .insert({
-      title,
-      description,
-      due_date: dueDate,
-      priority: template.priority,
-      status: 'open',
-      contact_id: context.contactId || null,
-      company_id: context.companyId || null,
-      deal_id: context.dealId || null,
-      org_id: orgId,
-      metadata: {
-        automated: true,
-        automation_source: automationSource
-      }
-    })
-    .select('id')
-    .single()
-  
-  if (error) {
-    console.error('Failed to create automated task:', error)
-    return { success: false, error: error.message }
-  }
-  
-  // Log the automation run
-  await logAutomationRun(automationSource, context, 'success', { taskId: data.id, title }, orgId)
-  
-  return { success: true, taskId: data.id }
-}
+  let tasksCreated = 0
 
-export async function createMultipleTasks(
-  templates: TaskTemplate[],
-  context: AutomationContext,
-  automationSource: string
-): Promise<{ success: boolean; taskIds: string[]; errors: string[] }> {
-  const results = await Promise.all(
-    templates.map(template => createAutomatedTask(template, context, automationSource))
-  )
-  
-  const taskIds = results.filter(r => r.success && r.taskId).map(r => r.taskId!)
-  const errors = results.filter(r => !r.success && r.error).map(r => r.error!)
-  
-  return {
-    success: errors.length === 0,
-    taskIds,
-    errors
+  for (const action of actions) {
+    if (action.type === 'create_task' || action.type === 'create_multiple_tasks') {
+      const cfg = action.config
+      const title = interpolateTemplate(cfg.title_template, context)
+      const description = cfg.description_template
+        ? interpolateTemplate(cfg.description_template, context)
+        : null
+      const dueDate = calculateDueDate(cfg.due_days, cfg.due_hours)
+
+      const { data, error } = await supabase
+        .from('tasks')
+        .insert({
+          title,
+          description,
+          due_date: dueDate,
+          priority: cfg.priority || 'normal',
+          status: 'open',
+          contact_id: context.contactId || null,
+          company_id: context.companyId || null,
+          deal_id: context.dealId || null,
+          org_id: orgId,
+          metadata: {
+            automated: true,
+            automation_source: automationName,
+            automation_id: automationId
+          }
+        })
+        .select('id')
+        .single()
+
+      if (!error && data) {
+        tasksCreated++
+      } else if (error) {
+        console.error(`Failed to create task for automation ${automationName}:`, error)
+      }
+    }
   }
+
+  // Update execution count and last_executed_at
+  try {
+    const { data: existing } = await supabase
+      .from('automations')
+      .select('execution_count')
+      .eq('id', automationId)
+      .single()
+
+    await supabase
+      .from('automations')
+      .update({
+        execution_count: (existing?.execution_count || 0) + tasksCreated,
+        last_executed_at: new Date().toISOString()
+      })
+      .eq('id', automationId)
+  } catch {
+    // Non-critical — don't fail the automation
+  }
+
+  return { tasksCreated }
 }
 
 async function logAutomationRun(
@@ -251,40 +286,54 @@ async function logAutomationRun(
       org_id: orgId
     })
   } catch (err) {
-    // Don't fail if logging fails (table might not exist yet)
-    console.warn('Failed to log automation run (table may not exist):', err)
+    console.warn('Failed to log automation run:', err)
   }
 }
 
 // ============================================
-// AUTOMATION TRIGGERS
+// AUTOMATION TRIGGERS (DB-driven)
 // ============================================
 
 /**
  * Trigger: Contact Created
- * Action: Create "First Touch" task
+ * Finds all active automations with trigger_type = 'contact_created' and runs them
  */
 export async function onContactCreated(context: {
   contactId: string
   contactName: string
   companyId?: string
   companyName?: string
-}) {
-  return createAutomatedTask(
-    TASK_TEMPLATES.firstTouch,
-    {
-      contactId: context.contactId,
-      contactName: context.contactName,
-      companyId: context.companyId,
-      companyName: context.companyName
-    },
-    'contact_created_first_touch'
-  )
+}): Promise<{ success: boolean; taskId?: string; error?: string }> {
+  const orgId = await getCurrentUserOrgId()
+  if (!orgId) return { success: false, error: 'No org found' }
+
+  const automations = await getActiveAutomations(orgId, 'contact_created')
+  if (automations.length === 0) return { success: true }
+
+  const ctx: AutomationContext = {
+    contactId: context.contactId,
+    contactName: context.contactName,
+    companyId: context.companyId,
+    companyName: context.companyName
+  }
+
+  let lastTaskId: string | undefined
+  for (const auto of automations) {
+    if (!matchesConditions(auto.conditions || [], ctx)) continue
+    if (await isDuplicate(auto.id, context.contactId, orgId)) continue
+
+    const result = await executeActions(auto.actions, ctx, auto.id, auto.name, orgId)
+    if (result.tasksCreated > 0) {
+      await logAutomationRun(auto.name, ctx, 'success', { tasksCreated: result.tasksCreated }, orgId)
+    }
+  }
+
+  return { success: true, taskId: lastTaskId }
 }
 
 /**
  * Trigger: Deal Created
- * Action: Create qualifying task
+ * Finds all active automations with trigger_type = 'deal_created' and runs them
  */
 export async function onDealCreated(context: {
   dealId: string
@@ -295,26 +344,41 @@ export async function onDealCreated(context: {
   contactName?: string
   companyId?: string
   companyName?: string
-}) {
-  return createAutomatedTask(
-    TASK_TEMPLATES.qualifyDeal,
-    {
-      dealId: context.dealId,
-      dealName: context.dealName,
-      dealAmount: context.dealAmount,
-      stageName: context.stageName,
-      contactId: context.contactId,
-      contactName: context.contactName,
-      companyId: context.companyId,
-      companyName: context.companyName
-    },
-    'deal_created_qualify'
-  )
+}): Promise<{ success: boolean; taskId?: string; error?: string }> {
+  const orgId = await getCurrentUserOrgId()
+  if (!orgId) return { success: false, error: 'No org found' }
+
+  const automations = await getActiveAutomations(orgId, 'deal_created')
+  if (automations.length === 0) return { success: true }
+
+  const ctx: AutomationContext = {
+    dealId: context.dealId,
+    dealName: context.dealName,
+    dealAmount: context.dealAmount,
+    stageName: context.stageName,
+    contactId: context.contactId,
+    contactName: context.contactName,
+    companyId: context.companyId,
+    companyName: context.companyName
+  }
+
+  for (const auto of automations) {
+    if (!matchesConditions(auto.conditions || [], ctx)) continue
+    if (await isDuplicate(auto.id, context.dealId, orgId)) continue
+
+    const result = await executeActions(auto.actions, ctx, auto.id, auto.name, orgId)
+    if (result.tasksCreated > 0) {
+      await logAutomationRun(auto.name, ctx, 'success', { tasksCreated: result.tasksCreated }, orgId)
+    }
+  }
+
+  return { success: true }
 }
 
 /**
  * Trigger: Deal Stage Changed
- * Action: Create stage-specific follow-up task
+ * Finds all active automations with trigger_type = 'deal_stage_changed',
+ * filters by stage match, and runs matching ones
  */
 export async function onDealStageChanged(context: {
   dealId: string
@@ -326,9 +390,19 @@ export async function onDealStageChanged(context: {
   contactName?: string
   companyId?: string
   companyName?: string
+  isWonStage?: boolean
+  isLostStage?: boolean
 }): Promise<{ tasksCreated: number; isWon: boolean; isLost: boolean }> {
+  const orgId = await getCurrentUserOrgId()
+  if (!orgId) return { tasksCreated: 0, isWon: false, isLost: false }
+
+  const automations = await getActiveAutomations(orgId, 'deal_stage_changed')
+  
   const newStage = context.newStageName.toLowerCase()
-  const automationContext: AutomationContext = {
+  const isWon = context.isWonStage ?? (newStage.includes('won') || newStage.includes('delivered') || newStage.includes('paid'))
+  const isLost = context.isLostStage ?? (newStage.includes('lost') || newStage.includes('declined') || newStage.includes('cancelled'))
+
+  const ctx: AutomationContext = {
     dealId: context.dealId,
     dealName: context.dealName,
     dealAmount: context.dealAmount,
@@ -340,76 +414,67 @@ export async function onDealStageChanged(context: {
     companyId: context.companyId,
     companyName: context.companyName
   }
-  
-  let tasksCreated = 0
-  
-  // Check for Proposal stage
-  if (newStage.includes('proposal')) {
-    await createAutomatedTask(
-      TASK_TEMPLATES.proposalFollowUp,
-      automationContext,
-      'deal_stage_proposal'
-    )
-    tasksCreated++
+
+  let totalTasksCreated = 0
+
+  for (const auto of automations) {
+    if (!matchesStageChange(auto.trigger_config, context.newStageName, isWon, isLost)) continue
+    if (!matchesConditions(auto.conditions || [], ctx)) continue
+    if (await isDuplicate(auto.id, context.dealId, orgId)) continue
+
+    const result = await executeActions(auto.actions, ctx, auto.id, auto.name, orgId)
+    totalTasksCreated += result.tasksCreated
+    if (result.tasksCreated > 0) {
+      await logAutomationRun(auto.name, ctx, 'success', { tasksCreated: result.tasksCreated }, orgId)
+    }
   }
-  
-  // Check for Negotiation stage
-  if (newStage.includes('negotiation')) {
-    await createAutomatedTask(
-      TASK_TEMPLATES.negotiationFollowUp,
-      automationContext,
-      'deal_stage_negotiation'
-    )
-    tasksCreated++
-  }
-  
-  // Check for Closed Won
-  if (newStage.includes('won') || newStage.includes('closed won')) {
-    const onboardingTasks = [
-      TASK_TEMPLATES.onboarding.welcome,
-      TASK_TEMPLATES.onboarding.billingConfirm,
-      TASK_TEMPLATES.onboarding.collectRequirements,
-      TASK_TEMPLATES.onboarding.kickoffCall,
-      TASK_TEMPLATES.onboarding.projectSetup
-    ]
-    
-    const result = await createMultipleTasks(
-      onboardingTasks,
-      automationContext,
-      'deal_won_onboarding'
-    )
-    tasksCreated += result.taskIds.length
-    
-    return { tasksCreated, isWon: true, isLost: false }
-  }
-  
-  // Check for Closed Lost
-  if (newStage.includes('lost') || newStage.includes('closed lost')) {
-    return { tasksCreated, isWon: false, isLost: true }
-  }
-  
-  return { tasksCreated, isWon: false, isLost: false }
+
+  return { tasksCreated: totalTasksCreated, isWon, isLost }
 }
 
 /**
  * Helper: Create revisit task for lost deal (called after user provides reason)
+ * This still runs directly — it's triggered by user action, not a DB automation
  */
 export async function createRevisitTaskForLostDeal(context: {
   dealId: string
   dealName: string
   contactId?: string
   companyId?: string
-}) {
-  return createAutomatedTask(
-    TASK_TEMPLATES.revisitLostDeal,
-    {
-      dealId: context.dealId,
-      dealName: context.dealName,
-      contactId: context.contactId,
-      companyId: context.companyId
-    },
-    'deal_lost_revisit'
-  )
+}): Promise<{ success: boolean; taskId?: string; error?: string }> {
+  const supabase = createClient()
+  const orgId = await getCurrentUserOrgId()
+  if (!orgId) return { success: false, error: 'No org found' }
+
+  const title = `Revisit lost deal: ${context.dealName || 'Deal'}`
+  const description = 'Check in to see if circumstances have changed. Timing may be better now.'
+  const dueDate = calculateDueDate(60)
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .insert({
+      title,
+      description,
+      due_date: dueDate,
+      priority: 'low',
+      status: 'open',
+      contact_id: context.contactId || null,
+      deal_id: context.dealId || null,
+      org_id: orgId,
+      metadata: {
+        automated: true,
+        automation_source: 'Deal Lost Revisit'
+      }
+    })
+    .select('id')
+    .single()
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  await logAutomationRun('deal_lost_revisit', { dealId: context.dealId, dealName: context.dealName }, 'success', { taskId: data.id, title }, orgId)
+  return { success: true, taskId: data.id }
 }
 
 // ============================================
@@ -426,7 +491,7 @@ export interface SuggestedTask {
 export function getSuggestedTasksForStage(stageName: string): SuggestedTask[] {
   const stage = stageName.toLowerCase()
   
-  if (stage.includes('lead')) {
+  if (stage.includes('lead') || stage.includes('inquiry') || stage.includes('prospect')) {
     return [
       { title: 'Qualify deal', description: 'Confirm budget, timeline, and decision maker', priority: 'high', dueDays: 1 },
       { title: 'Schedule intro call', description: 'Set up initial discovery call', priority: 'high', dueDays: 1 },
@@ -434,7 +499,7 @@ export function getSuggestedTasksForStage(stageName: string): SuggestedTask[] {
     ]
   }
   
-  if (stage.includes('qualified')) {
+  if (stage.includes('qualified') || stage.includes('booked') || stage.includes('confirmed')) {
     return [
       { title: 'Send proposal', description: 'Prepare and send formal proposal', priority: 'high', dueDays: 2 },
       { title: 'Send follow-up', description: 'Check in on status and questions', priority: 'normal', dueDays: 3 },
@@ -458,7 +523,7 @@ export function getSuggestedTasksForStage(stageName: string): SuggestedTask[] {
     ]
   }
   
-  if (stage.includes('won')) {
+  if (stage.includes('won') || stage.includes('delivered') || stage.includes('paid')) {
     return [
       { title: 'Schedule kickoff call', description: 'Set up project kickoff meeting', priority: 'high', dueDays: 1 },
       { title: 'Collect requirements', description: 'Gather detailed project requirements', priority: 'high', dueDays: 2 },
@@ -466,7 +531,7 @@ export function getSuggestedTasksForStage(stageName: string): SuggestedTask[] {
     ]
   }
   
-  if (stage.includes('lost')) {
+  if (stage.includes('lost') || stage.includes('declined') || stage.includes('cancelled')) {
     return [
       { title: 'Follow up in 60 days', description: 'Check if circumstances have changed', priority: 'low', dueDays: 60 }
     ]

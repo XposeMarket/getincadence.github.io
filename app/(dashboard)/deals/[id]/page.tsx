@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
   ArrowLeft, DollarSign, Calendar, Building2, Edit2, Trash2, 
-  Plus, CheckSquare, MessageSquare, Clock, X, UserCircle, MapPin, Users, Camera
+  Plus, CheckSquare, MessageSquare, Clock, X, UserCircle, MapPin, Users, Camera, Zap
 } from 'lucide-react'
 import { formatActivityTime, formatFullTimestamp } from '@/lib/date-utils'
 import CreateTaskModal from '@/components/tasks/CreateTaskModal'
@@ -132,7 +132,7 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
       setDeal(dealRes.data as Deal)
       const [stagesRes, tasksRes, activitiesRes] = await Promise.all([
         supabase.from('pipeline_stages').select('*').eq('pipeline_id', dealRes.data.pipeline_id).order('position'),
-        supabase.from('tasks').select('id, title, status, due_date').eq('deal_id', params.id).neq('status', 'completed'),
+        supabase.from('tasks').select('id, title, status, due_date, metadata').eq('deal_id', params.id).neq('status', 'completed'),
         supabase.from('activities').select('id, activity_type, subject, body, created_at, metadata').eq('deal_id', params.id).order('created_at', { ascending: false }).limit(20)
       ])
       if (stagesRes.data) setStages(stagesRes.data)
@@ -516,7 +516,14 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
                   <div key={t.id} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
                     <CheckSquare size={16} className="text-gray-400 shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate text-gray-900">{t.title}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-medium truncate text-gray-900">{t.title}</p>
+                        {(t as any).metadata?.automated && (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-700 bg-amber-50 px-1 py-0.5 rounded shrink-0" title={(t as any).metadata.automation_source || 'Automated'}>
+                            <Zap size={9} />
+                          </span>
+                        )}
+                      </div>
                       {t.due_date && <p className="text-xs text-gray-500">Due {new Date(t.due_date).toLocaleDateString()}</p>}
                     </div>
                   </div>

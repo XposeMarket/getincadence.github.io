@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { 
   Users, Building2, Handshake, CheckSquare, MessageSquare, 
   ArrowRight, TrendingUp, RefreshCw, Clock, GripVertical, Edit2, Check,
-  AlertTriangle, ExternalLink
+  AlertTriangle, ExternalLink, Zap
 } from 'lucide-react'
 import { formatActivityTime } from '@/lib/date-utils'
 import CreateTaskModal from '@/components/tasks/CreateTaskModal'
@@ -177,9 +177,9 @@ export default function DashboardPage() {
       supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('status', 'open'),
       supabase.from('activities').select('deal_id').eq('org_id', orgId).gte('created_at', sevenDaysAgo),
       supabase.from('activities').select('deal_id').eq('org_id', orgId).gte('created_at', thirtyDaysAgo),
-      supabase.from('tasks').select('id, title, due_date, status').eq('org_id', orgId).eq('status', 'open').order('due_date', { ascending: true }).limit(10),
+      supabase.from('tasks').select('id, title, due_date, status, metadata').eq('org_id', orgId).eq('status', 'open').order('due_date', { ascending: true }).limit(10),
       supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('org_id', orgId).lt('due_date', now.toISOString()).not('status', 'eq', 'completed'),
-      supabase.from('tasks').select('id, title, due_date').eq('org_id', orgId).neq('status', 'completed').lte('due_date', format(tomorrow, 'yyyy-MM-dd')).gte('due_date', format(now, 'yyyy-MM-dd')).order('due_date', { ascending: true })
+      supabase.from('tasks').select('id, title, due_date, metadata').eq('org_id', orgId).neq('status', 'completed').lte('due_date', format(tomorrow, 'yyyy-MM-dd')).gte('due_date', format(now, 'yyyy-MM-dd')).order('due_date', { ascending: true })
     ])
 
     if (activitiesRes.data) setActivities(activitiesRes.data)
@@ -568,7 +568,14 @@ export default function DashboardPage() {
           {tasksList.slice(0, 5).map((t) => (
             <div key={t.id} className="px-4 py-3 flex items-start justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-900">{t.title || 'Untitled Task'}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-sm font-medium text-gray-900">{t.title || 'Untitled Task'}</p>
+                  {(t as any).metadata?.automated && (
+                    <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-700 bg-amber-50 px-1 py-0.5 rounded shrink-0">
+                      <Zap size={9} />
+                    </span>
+                  )}
+                </div>
                 {t.due_date && (
                   <p className="text-xs text-gray-500 mt-0.5">Due {formatActivityTime(t.due_date)}</p>
                 )}

@@ -10,7 +10,8 @@ import {
   Building2, 
   Handshake,
   Calendar,
-  AlertCircle
+  AlertCircle,
+  Zap
 } from 'lucide-react'
 
 interface Task {
@@ -25,6 +26,7 @@ interface Task {
   deal_id: string | null
   assigned_to: string | null
   created_at: string
+  metadata?: { automated?: boolean; automation_source?: string } | null
   contacts: { id: string; first_name: string; last_name: string }[] | { id: string; first_name: string; last_name: string } | null
   companies: { id: string; name: string }[] | { id: string; name: string } | null
   deals: { id: string; name: string }[] | { id: string; name: string } | null
@@ -144,6 +146,12 @@ export default function TasksList({ tasks, onStatusChange }: TasksListProps) {
                   <span className={`badge ${getPriorityStyles(task.priority)}`}>
                     {task.priority}
                   </span>
+                  {task.metadata?.automated && (
+                    <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded" title={task.metadata.automation_source || 'Automated'}>
+                      <Zap size={10} />
+                      Auto
+                    </span>
+                  )}
                   {overdue && (
                     <span className="flex items-center gap-1 text-xs text-red-600">
                       <AlertCircle size={12} />
