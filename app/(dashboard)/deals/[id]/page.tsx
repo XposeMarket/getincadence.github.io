@@ -736,7 +736,7 @@ function EditDealModal({ deal, stages, contacts, companies, onClose, onSaved }: 
             </div>
             {!isPhotographer && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">{terminology.company}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Company</label>
                 <select value={companyId} onChange={(e) => setCompanyId(e.target.value)} className="input">
                   <option value="">None</option>
                   {companies.map(c => (
