@@ -74,6 +74,13 @@ export async function POST(request: Request) {
 
     // Generate signed upload URL using admin client (bypasses RLS on storage)
     const adminSupabase = createAdminClient()
+
+    // Ensure bucket exists (creates it on first upload)
+    const { data: buckets } = await adminSupabase.storage.listBuckets()
+    if (!buckets?.find((b: { name: string }) => b.name === BUCKET_NAME)) {
+      await adminSupabase.storage.createBucket(BUCKET_NAME, { public: false })
+    }
+
     const { data: uploadData, error: uploadError } = await adminSupabase
       .storage
       .from(BUCKET_NAME)
