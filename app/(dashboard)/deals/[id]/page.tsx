@@ -200,8 +200,19 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
 
   const handleDelete = async () => {
     setDeleting(true)
-    await supabase.from('deals').delete().eq('id', params.id)
-    router.push('/deals')
+    try {
+      const res = await fetch(`/api/deals/${params.id}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) {
+        throw new Error('Failed to delete deal')
+      }
+      router.push('/deals')
+    } catch (err) {
+      console.error(err)
+      setDeleting(false)
+      // Optionally show error to user
+    }
   }
 
   const handleAddNote = async () => {
