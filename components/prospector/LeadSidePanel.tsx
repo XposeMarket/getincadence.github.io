@@ -76,9 +76,9 @@ const LeadSidePanel: React.FC<LeadSidePanelProps> = ({
     return () => { if (timeoutRef.current) window.clearTimeout(timeoutRef.current); };
   }, []);
 
-  // Fetch place details + street view for Google Places leads
+  // Fetch place details (for Places-based leads) + street view (for all leads)
   useEffect(() => {
-    if (!selectedLead?.place_id) {
+    if (!selectedLead) {
       setPlaceDetails(null);
       setStreetViewData(null);
       setMapsUrl(null);
@@ -86,21 +86,47 @@ const LeadSidePanel: React.FC<LeadSidePanelProps> = ({
     }
     let cancelled = false;
     setLoadingDetails(true);
-    const params = new URLSearchParams({ place_id: selectedLead.place_id });
-    if (selectedLead.lat) params.set("lat", String(selectedLead.lat));
-    if (selectedLead.lng) params.set("lng", String(selectedLead.lng));
-    fetch(`/api/revenue-radar/place-details?${params}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (cancelled) return;
-        if (data?.details) setPlaceDetails(data.details);
-        if (data?.streetView) setStreetViewData(data.streetView);
-        if (data?.mapsUrl) setMapsUrl(data.mapsUrl);
-      })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) setLoadingDetails(false); });
+
+    if (selectedLead.place_id) {
+      // Places-based lead: fetch details + street view together
+      const params = new URLSearchParams({ place_id: selectedLead.place_id });
+      if (selectedLead.lat) params.set("lat", String(selectedLead.lat));
+      if (selectedLead.lng) params.set("lng", String(selectedLead.lng));
+      fetch(`/api/revenue-radar/place-details?${params}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (cancelled) return;
+          if (data?.details) setPlaceDetails(data.details);
+          if (data?.streetView) setStreetViewData(data.streetView);
+          if (data?.mapsUrl) setMapsUrl(data.mapsUrl);
+        })
+        .catch(() => {})
+        .finally(() => { if (!cancelled) setLoadingDetails(false); });
+    } else if (selectedLead.lat && selectedLead.lng) {
+      // Non-places lead (residential): fetch street view only
+      setPlaceDetails(null);
+      const params = new URLSearchParams({
+        lat: String(selectedLead.lat),
+        lng: String(selectedLead.lng),
+      });
+      fetch(`/api/revenue-radar/street-view?${params}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (cancelled) return;
+          if (data?.streetView) setStreetViewData(data.streetView);
+          if (data?.mapsUrl) setMapsUrl(data.mapsUrl);
+        })
+        .catch(() => {})
+        .finally(() => { if (!cancelled) setLoadingDetails(false); });
+    } else {
+      setPlaceDetails(null);
+      setStreetViewData(null);
+      setMapsUrl(null);
+      setLoadingDetails(false);
+    }
+
     return () => { cancelled = true; };
-  }, [selectedLead?.place_id, selectedLead?.lat, selectedLead?.lng]);
+  }, [selectedLead?.place_id, selectedLead?.lat, selectedLead?.lng, selectedLead?.id]);
 
   if (!localLead) return null;
 
@@ -380,7 +406,7 @@ const LeadSidePanel: React.FC<LeadSidePanelProps> = ({
             </>
           )}
 
-          {/* ── Street View Preview (Photographer) ───────────── */}
+          {/* ── Street View Preview ────────────────────────── */}
           {streetViewData?.available && streetViewData.urls.length > 0 && (
             <>
               <div className="border-t border-gray-800/50" />

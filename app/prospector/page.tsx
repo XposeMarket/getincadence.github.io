@@ -404,7 +404,7 @@ export default function ProspectorPage() {
           <div className="absolute left-2 right-2 sm:left-3 sm:right-3 top-2 sm:top-3 z-40 flex flex-col gap-2">
             {/* Row 1: Industry + Sub-type + Search */}
             <div
-              className="flex items-center gap-2 px-2.5 sm:px-3 py-2 rounded-2xl backdrop-blur-md border shadow-lg"
+              className="relative z-10 flex items-center gap-2 px-2.5 sm:px-3 py-2 rounded-2xl backdrop-blur-md border shadow-lg"
               style={{
                 background: "rgba(13, 17, 23, 0.82)",
                 borderColor: "rgba(55, 65, 81, 0.4)",

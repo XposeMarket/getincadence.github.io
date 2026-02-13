@@ -25,6 +25,7 @@ import { formatDistanceToNow } from 'date-fns'
 import ActivityTimeline from '@/components/shared/ActivityTimeline'
 import CreateTaskModal from '@/components/tasks/CreateTaskModal'
 import FilesList, { FileRecord } from '@/components/files/FilesList'
+import { LogCallModal, LogEmailModal, LogNoteModal, CommunicationTimeline } from '@/components/communications'
 
 interface Contact {
   id: string
@@ -85,6 +86,13 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
   const [orgId, setOrgId] = useState<string | null>(null)
   const [relatedFiles, setRelatedFiles] = useState<FileRecord[]>([])
   const [filesLoading, setFilesLoading] = useState(true)
+  // Communication modals
+  const [showCallModal, setShowCallModal] = useState(false)
+  const [showEmailModal, setShowEmailModal] = useState(false)
+  const [showNoteModal, setShowNoteModal] = useState(false)
+  const [commRefreshKey, setCommRefreshKey] = useState(0)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -92,6 +100,17 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
     const initOrg = async () => {
       const id = await getCurrentUserOrgId()
       setOrgId(id)
+      // Get current user info for comm permissions
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        setCurrentUserId(user.id)
+        const { data: profile } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+        if (profile?.role === 'admin') setIsAdmin(true)
+      }
     }
     initOrg()
   }, [])
@@ -237,55 +256,43 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
         {/* Main content */}
         <div className="col-span-2 space-y-6">
           {/* Quick actions */}
-          <div className="flex gap-3">
-            {contact.email && (
-              <a href={`mailto:${contact.email}`} className="btn btn-secondary">
-                <Mail size={16} className="mr-2" />
-                Email
-              </a>
-            )}
+          <div className="flex flex-wrap gap-3">
             {contact.phone && (
-              <a href={`tel:${contact.phone}`} className="btn btn-secondary">
+              <button onClick={() => setShowCallModal(true)} className="btn btn-secondary">
                 <Phone size={16} className="mr-2" />
-                Call
-              </a>
+                Log Call
+              </button>
             )}
+            {contact.email && (
+              <button onClick={() => setShowEmailModal(true)} className="btn btn-secondary">
+                <Mail size={16} className="mr-2" />
+                Log Email
+              </button>
+            )}
+            <button onClick={() => setShowNoteModal(true)} className="btn btn-secondary">
+              <MessageSquare size={16} className="mr-2" />
+              Add Note
+            </button>
             <button onClick={() => setShowTaskModal(true)} className="btn btn-secondary">
               <Plus size={16} className="mr-2" />
               Add Task
             </button>
           </div>
 
-          {/* Add note */}
-          <div className="card p-4">
-            <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600">
-                <MessageSquare size={16} />
-              </div>
-              <div className="flex-1">
-                <textarea
-                  value={newNote}
-                  onChange={(e) => setNewNote(e.target.value)}
-                  placeholder="Add a note..."
-                  rows={2}
-                  className="input resize-none"
-                />
-                {newNote.trim() && (
-                  <div className="mt-2 flex justify-end">
-                    <button
-                      onClick={handleAddNote}
-                      disabled={savingNote}
-                      className="btn btn-primary"
-                    >
-                      {savingNote ? 'Saving...' : 'Add Note'}
-                    </button>
-                  </div>
-                )}
-              </div>
+          {/* Communications timeline */}
+          <div className="card">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="font-semibold text-gray-900">Communications</h2>
             </div>
+            <CommunicationTimeline
+              leadId={params.id}
+              currentUserId={currentUserId || undefined}
+              isAdmin={isAdmin}
+              refreshKey={commRefreshKey}
+            />
           </div>
 
-          {/* Activity timeline */}
+          {/* Legacy activity timeline */}
           <div className="card">
             <div className="px-6 py-4 border-b border-gray-200">
               <h2 className="font-semibold text-gray-900">Activity</h2>
@@ -450,6 +457,35 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
             loadContact()
           }}
           prefillContactId={params.id}
+        />
+      )}
+
+      {/* Communication Modals */}
+      {showCallModal && (
+        <LogCallModal
+          leadId={params.id}
+          phoneNumber={contact.phone}
+          contactName={fullName}
+          onClose={() => setShowCallModal(false)}
+          onSaved={() => setCommRefreshKey((k) => k + 1)}
+        />
+      )}
+
+      {showEmailModal && (
+        <LogEmailModal
+          leadId={params.id}
+          defaultEmail={contact.email}
+          contactName={fullName}
+          onClose={() => setShowEmailModal(false)}
+          onSaved={() => setCommRefreshKey((k) => k + 1)}
+        />
+      )}
+
+      {showNoteModal && (
+        <LogNoteModal
+          leadId={params.id}
+          onClose={() => setShowNoteModal(false)}
+          onSaved={() => setCommRefreshKey((k) => k + 1)}
         />
       )}
     </div>

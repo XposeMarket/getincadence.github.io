@@ -7,7 +7,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
   ArrowLeft, DollarSign, Calendar, Building2, Edit2, Trash2, 
-  Plus, CheckSquare, MessageSquare, Clock, X, UserCircle, MapPin, Users, Camera, Zap, Paperclip
+  Plus, CheckSquare, MessageSquare, Clock, X, UserCircle, MapPin, Users, Camera, Zap, Paperclip,
+  Phone, Mail
 } from 'lucide-react'
 import { formatActivityTime, formatFullTimestamp } from '@/lib/date-utils'
 import CreateTaskModal from '@/components/tasks/CreateTaskModal'
@@ -17,6 +18,7 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner'
 import { useIndustry } from '@/lib/contexts/IndustryContext'
 import FilesList, { FileRecord } from '@/components/files/FilesList'
 import FileUploadModal from '@/components/files/FileUploadModal'
+import { LogCallModal, LogEmailModal, LogNoteModal, CommunicationTimeline } from '@/components/communications'
 
 interface PipelineStage {
   id: string
@@ -47,7 +49,7 @@ interface Deal {
   close_date: string | null
   description: string | null
   created_at: string
-  contacts: { id: string; first_name: string; last_name: string; email: string | null }[] | { id: string; first_name: string; last_name: string; email: string | null } | null
+  contacts: { id: string; first_name: string; last_name: string; email: string | null; phone: string | null }[] | { id: string; first_name: string; last_name: string; email: string | null; phone: string | null } | null
   companies: { id: string; name: string }[] | { id: string; name: string } | null
   // Photographer fields
   booking_type: 'personal' | 'event' | null
@@ -104,6 +106,13 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
   const [filesLoading, setFilesLoading] = useState(true)
   const [showFileUpload, setShowFileUpload] = useState(false)
   const [showNewVersionUpload, setShowNewVersionUpload] = useState<string | null>(null)
+  // Communication modals
+  const [showCallModal, setShowCallModal] = useState(false)
+  const [showEmailModal, setShowEmailModal] = useState(false)
+  const [showNoteModal, setShowNoteModal] = useState(false)
+  const [commRefreshKey, setCommRefreshKey] = useState(0)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [isAdminUser, setIsAdminUser] = useState(false)
   const router = useRouter()
   const supabase = createClient()
   const { terminology, config } = useIndustry()
@@ -113,6 +122,16 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
     const initOrg = async () => {
       const id = await getCurrentUserOrgId()
       setOrgId(id)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        setCurrentUserId(user.id)
+        const { data: profile } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+        if (profile?.role === 'admin') setIsAdminUser(true)
+      }
     }
     initOrg()
   }, [])
@@ -144,7 +163,7 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
     
     const dealRes = await supabase
       .from('deals')
-      .select('*, contacts(id, first_name, last_name, email), companies(id, name)')
+      .select('*, contacts(id, first_name, last_name, email, phone), companies(id, name)')
       .eq('id', params.id)
       .eq('org_id', orgId)
       .single()
@@ -356,6 +375,19 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
         {/* Left column - Activity */}
         <div className="lg:col-span-2 space-y-4 sm:space-y-6">
           <div className="flex flex-wrap gap-2 sm:gap-3">
+            {contact?.phone && (
+              <button onClick={() => setShowCallModal(true)} className="btn btn-secondary text-sm">
+                <Phone size={16} className="mr-1 sm:mr-2" />Log Call
+              </button>
+            )}
+            {contact?.email && (
+              <button onClick={() => setShowEmailModal(true)} className="btn btn-secondary text-sm">
+                <Mail size={16} className="mr-1 sm:mr-2" />Log Email
+              </button>
+            )}
+            <button onClick={() => setShowNoteModal(true)} className="btn btn-secondary text-sm">
+              <MessageSquare size={16} className="mr-1 sm:mr-2" />Add Note
+            </button>
             <button onClick={() => setShowTaskModal(true)} className="btn btn-secondary text-sm">
               <Plus size={16} className="mr-1 sm:mr-2" />Add {terminology.task}
             </button>
@@ -387,6 +419,19 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Communications timeline */}
+          <div className="card">
+            <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200">
+              <h2 className="font-semibold text-gray-900">Communications</h2>
+            </div>
+            <CommunicationTimeline
+              dealId={params.id}
+              currentUserId={currentUserId || undefined}
+              isAdmin={isAdminUser}
+              refreshKey={commRefreshKey}
+            />
           </div>
 
           {/* Activity feed */}
@@ -656,6 +701,37 @@ export default function DealDetailPage({ params }: { params: { id: string } }) {
           onClose={() => setShowTaskModal(false)} 
           onCreated={() => { setShowTaskModal(false); loadDeal() }} 
           prefillDealId={params.id} 
+        />
+      )}
+
+      {/* Communication Modals */}
+      {showCallModal && contact && (
+        <LogCallModal
+          dealId={params.id}
+          leadId={contact.id}
+          phoneNumber={contact.phone || null}
+          contactName={`${contact.first_name} ${contact.last_name}`}
+          onClose={() => setShowCallModal(false)}
+          onSaved={() => setCommRefreshKey((k) => k + 1)}
+        />
+      )}
+
+      {showEmailModal && contact && (
+        <LogEmailModal
+          dealId={params.id}
+          leadId={contact.id}
+          defaultEmail={contact.email || null}
+          contactName={`${contact.first_name} ${contact.last_name}`}
+          onClose={() => setShowEmailModal(false)}
+          onSaved={() => setCommRefreshKey((k) => k + 1)}
+        />
+      )}
+
+      {showNoteModal && (
+        <LogNoteModal
+          dealId={params.id}
+          onClose={() => setShowNoteModal(false)}
+          onSaved={() => setCommRefreshKey((k) => k + 1)}
         />
       )}
 
