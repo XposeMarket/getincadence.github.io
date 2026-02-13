@@ -194,6 +194,46 @@ body {
   }
 }
 
+/* =====================================================
+   PROSPECTOR / REVENUE RADAR MAP STYLES
+   ===================================================== */
+
+/* Range slider for dark map UI */
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #E91E8C;
+  border: 2px solid #0D1117;
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(233, 30, 140, 0.4);
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #E91E8C;
+  border: 2px solid #0D1117;
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(233, 30, 140, 0.4);
+}
+
+/* Animate-in utilities for search area button */
+@keyframes animate-in-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes animate-in-slide-top {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-in {
+  animation: animate-in-slide-top 0.25s ease-out forwards;
+}
+
 /* Hide scrollbar utility */
 .scrollbar-hide {
   -ms-overflow-style: none;

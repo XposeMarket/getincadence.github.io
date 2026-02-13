@@ -57,6 +57,7 @@ function getNavigation(terminology: ReturnType<typeof getTerminology>): NavItem[
     { name: terminology.deals, href: '/deals', icon: Handshake },
     { name: terminology.tasks, href: '/tasks', icon: CheckSquare },
     { name: terminology.reports, href: '/reports', icon: BarChart3, adminOnly: true },
+    { name: 'Prospector', href: '/prospector', icon: Zap },
   ]
 }
 

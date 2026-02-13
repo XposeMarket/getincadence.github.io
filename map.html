@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cadence – Revenue Radar (Dark Map Demo)</title>
+
+  <!-- MapLibre GL JS -->
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.18.0/dist/maplibre-gl.css" />
+  <script src="https://unpkg.com/maplibre-gl@5.18.0/dist/maplibre-gl.js"></script>
+
+  <style>
+    :root{
+      --bg:#0b0f14;
+      --panel:#0f1620cc;
+      --panel2:#0f1620;
+      --line:#1c2633;
+      --text:#d6dde7;
+      --muted:#8b9bb0;
+      --accent:#ff2d8a;
+      --good:#35ff7a;
+      --warn:#ffd84d;
+      --storm:#ff3b3b;
+      --permit:#3aa0ff;
+    }
+    *{ box-sizing:border-box; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
+    body{ margin:0; background:var(--bg); color:var(--text); overflow:hidden; }
+    #app{ position:fixed; inset:0; display:grid; grid-template-columns: 1fr 380px; }
+    #map{ width:100%; height:100%; }
+
+    .controls{
+      position:absolute; left:16px; top:16px; z-index:5;
+      width: 360px;
+      background: var(--panel);
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:14px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 10px 30px rgba(0,0,0,.45);
+    }
+    .row{ display:flex; gap:10px; align-items:center; }
+    .row + .row{ margin-top:10px; }
+    .title{
+      display:flex; align-items:center; justify-content:space-between;
+      margin-bottom:10px;
+    }
+    .title h1{ font-size:14px; margin:0; letter-spacing:.6px; text-transform:uppercase; color:#bcd0ea; }
+    .pill{
+      font-size:12px; color:#0b0f14; background:var(--accent);
+      padding:4px 10px; border-radius:999px; font-weight:700;
+    }
+    label{ font-size:12px; color:var(--muted); }
+    input[type="range"]{ width:100%; }
+    .btn{
+      appearance:none; border:1px solid var(--line);
+      background: #0c121b;
+      color: var(--text);
+      padding:10px 12px;
+      border-radius:12px;
+      cursor:pointer;
+      transition: transform .05s ease, background .15s ease;
+      font-weight:600;
+      font-size:13px;
+    }
+    .btn:hover{ background:#0e1722; }
+    .btn:active{ transform: translateY(1px); }
+    .btn.primary{ border-color: transparent; background: var(--accent); color:#0b0f14; font-weight:800; }
+    .btn.ghost{ background: transparent; }
+    .toggle{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:10px 12px;
+      border:1px solid var(--line);
+      border-radius:12px;
+      background:#0c121b;
+    }
+    .toggle span{ font-size:13px; }
+    .toggle input{ transform: scale(1.1); }
+    .small{ font-size:12px; color:var(--muted); line-height:1.4; }
+    .divider{ height:1px; background:var(--line); margin:12px 0; }
+
+    .side{
+      border-left:1px solid var(--line);
+      background: linear-gradient(180deg, #0b0f14, #0a0d12);
+      padding:16px;
+      overflow:auto;
+    }
+    .card{
+      background: #0c121b;
+      border: 1px solid var(--line);
+      border-radius:16px;
+      padding:14px;
+      margin-bottom:12px;
+    }
+    .card h2{ margin:0 0 8px; font-size:14px; }
+    .kv{ display:grid; grid-template-columns: 110px 1fr; gap:8px; font-size:13px; }
+    .kv div:nth-child(odd){ color:var(--muted); }
+    .score{
+      display:flex; align-items:center; gap:10px; margin-top:10px;
+    }
+    .bar{
+      flex:1; height:8px; border-radius:999px; background:#101b2a; overflow:hidden; border:1px solid var(--line);
+    }
+    .bar > i{ display:block; height:100%; width:0%; background: var(--good); }
+    .reasons{ margin-top:10px; padding-left:16px; color:var(--text); font-size:13px; }
+    .reasons li{ margin:4px 0; color:#cfe0ff; }
+    .actions{ display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+    .tag{
+      display:inline-flex; gap:6px; align-items:center;
+      font-size:12px; padding:4px 10px; border-radius:999px;
+      background:#0e1722; border:1px solid var(--line); color:#cfe0ff;
+    }
+    .dot{ width:8px; height:8px; border-radius:50%; display:inline-block; background: var(--muted); }
+    .dot.storm{ background: var(--storm); }
+    .dot.permit{ background: var(--permit); }
+    .dot.age{ background: var(--good); }
+
+    .searchArea{
+      position:absolute; left:50%; top:16px; transform:translateX(-50%);
+      z-index:6;
+      display:none;
+    }
+
+    /* MapLibre UI tweaks */
+    .maplibregl-ctrl-group{ background:#0c121b !important; border:1px solid var(--line) !important; }
+    .maplibregl-ctrl-group button{ filter: invert(0.9); }
+    .maplibregl-popup-content{
+      background:#0c121b; color:var(--text); border:1px solid var(--line);
+      border-radius:14px; box-shadow:0 15px 40px rgba(0,0,0,.5);
+      padding:10px 12px;
+    }
+    .maplibregl-popup-tip{ border-top-color:#0c121b !important; border-bottom-color:#0c121b !important; }
+
+    /* Attribution + watermark styling */
+    .maplibregl-ctrl-attrib{ background: rgba(12,18,27,.65) !important; border:1px solid var(--line) !important; border-radius:12px !important; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div style="position:relative;">
+    <div id="map"></div>
+
+    <div class="controls">
+      <div class="title">
+        <h1>Revenue Radar</h1>
+        <span class="pill">DEMO</span>
+      </div>
+
+      <div class="row" style="justify-content:space-between;">
+        <div>
+          <label>Center</label>
+          <div id="centerText" style="font-size:13px; margin-top:2px; color:#cfe0ff;"></div>
+        </div>
+        <button class="btn ghost" id="btnUseMe">Use my location</button>
+      </div>
+
+      <div class="row" style="flex-direction:column; align-items:stretch;">
+        <div class="row" style="justify-content:space-between;">
+          <label>Radius (miles)</label>
+          <div id="radiusLabel" style="font-size:12px; color:#cfe0ff;">15</div>
+        </div>
+        <input id="radius" type="range" min="5" max="50" step="1" value="15" />
+        <div class="small">Constraint: search only runs inside this radius. Results are capped + clustered.</div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="row" style="gap:8px;">
+        <button class="btn primary" id="btnRun">Run Search</button>
+        <button class="btn" id="btnClear">Clear</button>
+      </div>
+
+      <div class="row">
+        <div class="toggle" style="flex:1;">
+          <span><span class="dot storm"></span> Storm layer</span>
+          <input id="togStorm" type="checkbox" checked />
+        </div>
+      </div>
+      <div class="row">
+        <div class="toggle" style="flex:1;">
+          <span><span class="dot permit"></span> Permit layer</span>
+          <input id="togPermit" type="checkbox" checked />
+        </div>
+      </div>
+      <div class="row">
+        <div class="toggle" style="flex:1;">
+          <span><span class="dot age"></span> Age signals</span>
+          <input id="togAge" type="checkbox" checked />
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="small">
+        Interaction rules:
+        <ul style="margin:8px 0 0; padding-left:18px;">
+          <li>Panning does <b>not</b> auto-run searches.</li>
+          <li>After pan/zoom, use <b>Search this area</b>.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="searchArea" id="searchAreaWrap">
+      <button class="btn primary" id="btnSearchArea">Search this area</button>
+    </div>
+  </div>
+
+  <aside class="side">
+    <div class="card">
+      <h2>Selected Lead</h2>
+      <div class="small">Click a ping to see details here. This panel is what you’d connect to “Create Opportunity” in Cadence.</div>
+    </div>
+
+    <div class="card" id="leadCard" style="display:none;">
+      <h2 id="leadTitle">123 Demo St</h2>
+
+      <div class="row" style="justify-content:space-between; margin-bottom:8px;">
+        <span class="tag"><span class="dot storm"></span><span>Storm</span></span>
+        <span class="tag"><span class="dot age"></span><span>Age</span></span>
+        <span class="tag"><span class="dot permit"></span><span>Permit</span></span>
+      </div>
+
+      <div class="kv">
+        <div>Score</div><div id="leadScoreTxt">8.4 / 10</div>
+        <div>Type</div><div id="leadTypeTxt">Roofing</div>
+        <div>Trigger</div><div id="leadTriggerTxt">Hail + Roof Age</div>
+        <div>Status</div><div id="leadStatusTxt">New</div>
+      </div>
+
+      <div class="score">
+        <div class="bar"><i id="scoreBar"></i></div>
+      </div>
+
+      <ul class="reasons" id="leadReasons"></ul>
+
+      <div class="actions">
+        <button class="btn primary">Create Opportunity</button>
+        <button class="btn">Mark Visited</button>
+        <button class="btn">Generate Door Script</button>
+        <button class="btn">Generate Mailer</button>
+        <button class="btn">Generate Ad Copy</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Constraints (Demo)</h2>
+      <div class="small">
+        <ul style="margin:8px 0 0; padding-left:18px;">
+          <li>Radius: <b>5–50 miles</b></li>
+          <li>Results cap: <b>500 leads</b> (clustered)</li>
+          <li>Search only on <b>Run Search</b> / <b>Search this area</b></li>
+        </ul>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<script>
+  // --- Basemap (dark) ---
+  // CARTO "Dark Matter" style URL (Mapbox style spec compatible; works in MapLibre)
+  // See docs listing style URL. :contentReference[oaicite:1]{index=1}
+  const BASE_STYLE_URL = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+
+  // Default demo center (Frederick, MD)
+  const DEFAULT_CENTER = [-77.4105, 39.4143]; // [lng, lat]
+  let currentCenter = [...DEFAULT_CENTER];
+  let currentRadiusMiles = 15;
+  let lastSearchCenter = [...DEFAULT_CENTER];
+
+  const map = new maplibregl.Map({
+    container: "map",
+    style: BASE_STYLE_URL,
+    center: DEFAULT_CENTER,
+    zoom: 11.2,
+    pitch: 0,
+    bearing: 0
+  });
+
+  map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), "bottom-right");
+
+  // UI refs
+  const centerText = document.getElementById("centerText");
+  const radiusInput = document.getElementById("radius");
+  const radiusLabel = document.getElementById("radiusLabel");
+  const btnRun = document.getElementById("btnRun");
+  const btnClear = document.getElementById("btnClear");
+  const btnUseMe = document.getElementById("btnUseMe");
+  const togStorm = document.getElementById("togStorm");
+  const togPermit = document.getElementById("togPermit");
+  const togAge = document.getElementById("togAge");
+  const searchAreaWrap = document.getElementById("searchAreaWrap");
+  const btnSearchArea = document.getElementById("btnSearchArea");
+
+  // Lead panel
+  const leadCard = document.getElementById("leadCard");
+  const leadTitle = document.getElementById("leadTitle");
+  const leadScoreTxt = document.getElementById("leadScoreTxt");
+  const leadTypeTxt = document.getElementById("leadTypeTxt");
+  const leadTriggerTxt = document.getElementById("leadTriggerTxt");
+  const leadStatusTxt = document.getElementById("leadStatusTxt");
+  const scoreBar = document.getElementById("scoreBar");
+  const leadReasons = document.getElementById("leadReasons");
+
+  // Helpers
+  function fmtCenter(lngLat){ return `${lngLat[1].toFixed(4)}, ${lngLat[0].toFixed(4)}`; }
+  function milesToMeters(mi){ return mi * 1609.344; }
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, s => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+    }[s]));
+  }
+  function distMeters(aLngLat, bLngLat){
+    const R = 6371000, toRad = d => d * Math.PI / 180;
+    const [lng1, lat1] = aLngLat.map(toRad);
+    const [lng2, lat2] = bLngLat.map(toRad);
+    const dLat = lat2 - lat1, dLng = lng2 - lng1;
+    const sin1 = Math.sin(dLat/2), sin2 = Math.sin(dLng/2);
+    const h = sin1*sin1 + Math.cos(lat1)*Math.cos(lat2)*sin2*sin2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  }
+  function randomPointOnCircle(centerLngLat, radiusMeters, angle){
+    const lat = centerLngLat[1] * Math.PI/180;
+    const metersPerDegLat = 111132.92 - 559.82*Math.cos(2*lat) + 1.175*Math.cos(4*lat);
+    const metersPerDegLng = 111412.84*Math.cos(lat) - 93.5*Math.cos(3*lat);
+    const dLat = (radiusMeters * Math.sin(angle)) / metersPerDegLat;
+    const dLng = (radiusMeters * Math.cos(angle)) / metersPerDegLng;
+    return [centerLngLat[0] + dLng, centerLngLat[1] + dLat];
+  }
+  function randomPointInRadius(centerLngLat, radiusMeters){
+    const r = radiusMeters * Math.sqrt(Math.random());
+    const theta = Math.random() * 2 * Math.PI;
+
+    const lat = centerLngLat[1] * Math.PI/180;
+    const metersPerDegLat = 111132.92 - 559.82*Math.cos(2*lat) + 1.175*Math.cos(4*lat);
+    const metersPerDegLng = 111412.84*Math.cos(lat) - 93.5*Math.cos(3*lat);
+
+    const dLat = (r * Math.sin(theta)) / metersPerDegLat;
+    const dLng = (r * Math.cos(theta)) / metersPerDegLng;
+
+    return [centerLngLat[0] + dLng, centerLngLat[1] + dLat];
+  }
+
+  // Mock storm polygon (circle-ish)
+  function makeStormPolygon(centerLngLat, radiusMeters){
+    const steps = 56;
+    const pts = [];
+    for(let i=0;i<=steps;i++){
+      const angle = (i/steps) * Math.PI * 2;
+      pts.push(randomPointOnCircle(centerLngLat, radiusMeters * 0.62, angle));
+    }
+    return {
+      type:"Feature",
+      geometry:{ type:"Polygon", coordinates:[pts] },
+      properties:{ label:"Hail Event • 1.5in • 72h" }
+    };
+  }
+
+  function buildMockLeads(centerLngLat, radiusMiles){
+    const radiusMeters = milesToMeters(radiusMiles);
+    const MAX = 450;
+    const count = Math.min(MAX, Math.floor(130 + radiusMiles * 7));
+    const types = ["Roofing", "HVAC"];
+    const streets = ["Oak Ridge Dr","Maple Ave","Pinecrest Ln","Cedar St","Monocacy Blvd","Market St","Patrick St"];
+
+    const features = [];
+    for(let i=0;i<count;i++){
+      const pt = randomPointInRadius(centerLngLat, radiusMeters);
+      const d = distMeters(centerLngLat, pt);
+
+      const hasStorm = togStorm.checked && (Math.random() < 0.65);
+      const hasPermit = togPermit.checked && (Math.random() < 0.25);
+      const hasAge = togAge.checked && (Math.random() < 0.55);
+
+      let score = 4.2;
+      score += hasStorm ? 2.2 : 0;
+      score += hasAge ? 1.8 : 0;
+      score += hasPermit ? 1.4 : 0;
+      score += Math.max(0, 1.2 - (d / radiusMeters) * 1.2);
+      score = Math.max(0, Math.min(10, score + (Math.random()*0.6 - 0.3)));
+
+      const t = types[Math.floor(Math.random()*types.length)];
+      const addrNum = 100 + Math.floor(Math.random()*8900);
+      const street = streets[Math.floor(Math.random()*streets.length)];
+
+      const reasons = [];
+      if(hasStorm) reasons.push("Recent hail/wind impact in this area (last 72h).");
+      if(hasAge) reasons.push("Home age suggests roof/HVAC nearing service window.");
+      if(hasPermit) reasons.push("Permit activity nearby indicates active upgrades.");
+      if(reasons.length === 0) reasons.push("Opportunity cluster detected based on area signals.");
+
+      features.push({
+        type:"Feature",
+        geometry:{ type:"Point", coordinates: pt },
+        properties:{
+          id: `lead_${Date.now()}_${i}`,
+          address: `${addrNum} ${street}`,
+          city: "Frederick, MD",
+          score: +score.toFixed(1),
+          type: t,
+          trigger: hasStorm ? "Storm" : (hasPermit ? "Permit" : "Age"),
+          status: "New",
+          reasons,
+          hasPermit
+        }
+      });
+    }
+    return { type:"FeatureCollection", features };
+  }
+
+  function buildMockPermits(leadsFC){
+    const feats = leadsFC.features
+      .filter(f => f.properties.hasPermit)
+      .slice(0, 120)
+      .map((f, idx) => ({
+        type:"Feature",
+        geometry:f.geometry,
+        properties:{
+          id:`permit_${idx}`,
+          permitType: (Math.random()<0.5) ? "Roof Replacement" : "HVAC Install",
+          date: `${1+Math.floor(Math.random()*10)} days ago`,
+          address: f.properties.address
+        }
+      }));
+    return { type:"FeatureCollection", features: feats };
+  }
+
+  function setLayerVisibility(id, visible){
+    if(map.getLayer(id)){
+      map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
+    }
+  }
+
+  function showLeadDetails(props){
+    leadCard.style.display = "block";
+    leadTitle.textContent = `${props.address}, ${props.city}`;
+    leadScoreTxt.textContent = `${props.score} / 10`;
+    leadTypeTxt.textContent = props.type;
+    leadTriggerTxt.textContent = props.trigger;
+    leadStatusTxt.textContent = props.status || "New";
+
+    const pct = Math.max(0, Math.min(100, (props.score/10)*100));
+    scoreBar.style.width = pct.toFixed(0) + "%";
+    scoreBar.style.background = (props.score >= 8.5) ? "var(--good)" : (props.score >= 7 ? "var(--warn)" : "var(--accent)");
+
+    leadReasons.innerHTML = "";
+    (props.reasons || []).forEach(r => {
+      const li = document.createElement("li");
+      li.textContent = r;
+      leadReasons.appendChild(li);
+    });
+  }
+
+  function ensureSourcesAndLayers(){
+    // Leads (clustered)
+    if(!map.getSource("leads")){
+      map.addSource("leads", {
+        type:"geojson",
+        data: { type:"FeatureCollection", features:[] },
+        cluster: true,
+        clusterRadius: 52,
+        clusterMaxZoom: 13
+      });
+
+      map.addLayer({
+        id:"lead-clusters",
+        type:"circle",
+        source:"leads",
+        filter:["has","point_count"],
+        paint:{
+          "circle-color":"#102034",
+          "circle-stroke-color":"#223149",
+          "circle-stroke-width":1,
+          "circle-radius":[ "step", ["get","point_count"], 18, 50, 22, 150, 26 ],
+          "circle-opacity":0.9
+        }
+      });
+
+      map.addLayer({
+        id:"lead-cluster-count",
+        type:"symbol",
+        source:"leads",
+        filter:["has","point_count"],
+        layout:{ "text-field":"{point_count_abbreviated}", "text-size":12 },
+        paint:{ "text-color":"#cfe0ff" }
+      });
+
+      map.addLayer({
+        id:"lead-points",
+        type:"circle",
+        source:"leads",
+        filter:["!=", ["has","point_count"], true],
+        paint:{
+          "circle-radius":[ "interpolate", ["linear"], ["zoom"], 8, 4, 13, 7, 16, 10 ],
+          "circle-color":[
+            "case",
+            [">=", ["get","score"], 8.5], "#35ff7a",
+            [">=", ["get","score"], 7.0], "#ffd84d",
+            "#ff2d8a"
+          ],
+          "circle-opacity":0.95,
+          "circle-stroke-color":"#0b0f14",
+          "circle-stroke-width":1.2
+        }
+      });
+
+      map.on("click", "lead-clusters", (e) => {
+        const features = map.queryRenderedFeatures(e.point, { layers:["lead-clusters"] });
+        const clusterId = features[0].properties.cluster_id;
+        map.getSource("leads").getClusterExpansionZoom(clusterId, (err, zoom) => {
+          if(err) return;
+          map.easeTo({ center: features[0].geometry.coordinates, zoom });
+        });
+      });
+
+      map.on("click", "lead-points", (e) => {
+        const f = e.features[0];
+        showLeadDetails(f.properties);
+        new maplibregl.Popup({ closeButton:true })
+          .setLngLat(f.geometry.coordinates)
+          .setHTML(`<div style="font-weight:800;margin-bottom:4px;">${escapeHtml(f.properties.address)}</div>
+                    <div style="font-size:12px;color:#8b9bb0">Score: <b style="color:#cfe0ff">${f.properties.score}</b> • ${escapeHtml(f.properties.type)}</div>`)
+          .addTo(map);
+      });
+
+      map.on("mouseenter", "lead-points", () => map.getCanvas().style.cursor = "pointer");
+      map.on("mouseleave", "lead-points", () => map.getCanvas().style.cursor = "");
+      map.on("mouseenter", "lead-clusters", () => map.getCanvas().style.cursor = "pointer");
+      map.on("mouseleave", "lead-clusters", () => map.getCanvas().style.cursor = "");
+    }
+
+    // Storm
+    if(!map.getSource("storm")){
+      map.addSource("storm", { type:"geojson", data:{ type:"FeatureCollection", features:[] } });
+
+      map.addLayer({
+        id:"storm-fill",
+        type:"fill",
+        source:"storm",
+        paint:{ "fill-color":"#ff3b3b", "fill-opacity":0.18 }
+      });
+
+      map.addLayer({
+        id:"storm-line",
+        type:"line",
+        source:"storm",
+        paint:{ "line-color":"#ff3b3b", "line-width":2, "line-opacity":0.75 }
+      });
+
+      map.on("click", "storm-fill", (e) => {
+        const f = e.features[0];
+        new maplibregl.Popup()
+          .setLngLat(e.lngLat)
+          .setHTML(`<div style="font-weight:800;margin-bottom:4px;">Storm Zone</div>
+                    <div style="font-size:12px;color:#cfe0ff">${escapeHtml(f.properties.label || "Severe weather event")}</div>`)
+          .addTo(map);
+      });
+      map.on("mouseenter", "storm-fill", () => map.getCanvas().style.cursor = "pointer");
+      map.on("mouseleave", "storm-fill", () => map.getCanvas().style.cursor = "");
+    }
+
+    // Permits
+    if(!map.getSource("permits")){
+      map.addSource("permits", { type:"geojson", data:{ type:"FeatureCollection", features:[] } });
+
+      map.addLayer({
+        id:"permit-points",
+        type:"circle",
+        source:"permits",
+        paint:{
+          "circle-radius":[ "interpolate", ["linear"], ["zoom"], 8, 3, 13, 6, 16, 8 ],
+          "circle-color":"#3aa0ff",
+          "circle-opacity":0.9,
+          "circle-stroke-color":"#0b0f14",
+          "circle-stroke-width":1.2
+        }
+      });
+
+      map.on("click", "permit-points", (e) => {
+        const f = e.features[0];
+        new maplibregl.Popup()
+          .setLngLat(f.geometry.coordinates)
+          .setHTML(`<div style="font-weight:800;margin-bottom:4px;">${escapeHtml(f.properties.permitType)}</div>
+                    <div style="font-size:12px;color:#8b9bb0">${escapeHtml(f.properties.address)} • ${escapeHtml(f.properties.date)}</div>`)
+          .addTo(map);
+      });
+
+      map.on("mouseenter", "permit-points", () => map.getCanvas().style.cursor = "pointer");
+      map.on("mouseleave", "permit-points", () => map.getCanvas().style.cursor = "");
+    }
+  }
+
+  function runSearch(centerLngLat){
+    const leads = buildMockLeads(centerLngLat, currentRadiusMiles);
+    const permits = buildMockPermits(leads);
+    const storm = makeStormPolygon(centerLngLat, milesToMeters(currentRadiusMiles));
+
+    map.getSource("leads").setData(leads);
+    map.getSource("permits").setData(permits);
+    map.getSource("storm").setData({ type:"FeatureCollection", features: togStorm.checked ? [storm] : [] });
+
+    lastSearchCenter = [...centerLngLat];
+    searchAreaWrap.style.display = "none";
+
+    setLayerVisibility("storm-fill", togStorm.checked);
+    setLayerVisibility("storm-line", togStorm.checked);
+    setLayerVisibility("permit-points", togPermit.checked);
+
+    // Fit to radius (nice for demo)
+    const r = milesToMeters(currentRadiusMiles);
+    const p1 = randomPointOnCircle(centerLngLat, r, 0);
+    const p2 = randomPointOnCircle(centerLngLat, r, Math.PI);
+    const bounds = new maplibregl.LngLatBounds(p1, p2);
+    map.fitBounds(bounds, { padding: 80, duration: 700 });
+  }
+
+  function clearSearch(){
+    if(map.getSource("leads")) map.getSource("leads").setData({ type:"FeatureCollection", features:[] });
+    if(map.getSource("permits")) map.getSource("permits").setData({ type:"FeatureCollection", features:[] });
+    if(map.getSource("storm")) map.getSource("storm").setData({ type:"FeatureCollection", features:[] });
+    leadCard.style.display = "none";
+  }
+
+  function updateCenterText(){
+    const c = map.getCenter();
+    currentCenter = [c.lng, c.lat];
+    centerText.textContent = fmtCenter(currentCenter);
+  }
+
+  map.on("load", () => {
+    ensureSourcesAndLayers();
+    updateCenterText();
+    runSearch(DEFAULT_CENTER);
+  });
+
+  map.on("move", () => {
+    updateCenterText();
+    const moved = distMeters(lastSearchCenter, currentCenter);
+    if(moved > 900) searchAreaWrap.style.display = "block"; // ~0.56mi
+  });
+
+  radiusInput.addEventListener("input", () => {
+    currentRadiusMiles = Number(radiusInput.value);
+    radiusLabel.textContent = String(currentRadiusMiles);
+  });
+
+  btnRun.addEventListener("click", () => runSearch(currentCenter));
+  btnSearchArea.addEventListener("click", () => runSearch(currentCenter));
+  btnClear.addEventListener("click", clearSearch);
+
+  togStorm.addEventListener("change", () => {
+    setLayerVisibility("storm-fill", togStorm.checked);
+    setLayerVisibility("storm-line", togStorm.checked);
+    if(!togStorm.checked && map.getSource("storm")){
+      map.getSource("storm").setData({ type:"FeatureCollection", features:[] });
+    }
+  });
+
+  togPermit.addEventListener("change", () => setLayerVisibility("permit-points", togPermit.checked));
+
+  // Age toggle affects generation logic only in this demo (kept for parity with your plan)
+  togAge.addEventListener("change", () => { /* no-op for now */ });
+
+  btnUseMe.addEventListener("click", () => {
+    if(!navigator.geolocation){
+      alert("Geolocation not supported in this browser.");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const c = [pos.coords.longitude, pos.coords.latitude];
+      map.easeTo({ center: c, zoom: 12.5, duration: 700 });
+      // Keep rule: do not auto-run
+      searchAreaWrap.style.display = "block";
+    }, () => {
+      alert("Could not get location (permission denied or unavailable).");
+    }, { enableHighAccuracy: true, timeout: 8000 });
+  });
+</script>
+</body>
+</html>
