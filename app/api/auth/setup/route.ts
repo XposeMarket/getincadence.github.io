@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { getIndustryConfig, IndustryType } from '@/lib/industry-config'
+import { getVertical, VerticalId } from '@/lib/verticals'
 import { buildSeedRows } from '@/lib/automation-presets'
 
 export async function POST(request: NextRequest) {
@@ -25,9 +25,9 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminClient()
     console.log('Admin client created')
 
-    // Get industry config for pipeline creation
-    const industryConfig = getIndustryConfig(industryType as IndustryType || 'default')
-    console.log('Using industry config:', industryConfig.id)
+    // Get vertical config for pipeline creation
+    const verticalConfig = getVertical(industryType as VerticalId || 'default')
+    console.log('Using vertical config:', verticalConfig.id)
 
     // Create the organization
     console.log('Creating organization...')
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
 
     // Create default pipeline for the org
     console.log('Creating default pipeline...')
-    const pipelineName = industryConfig.terminology.pipeline || 'Pipeline'
+    const pipelineName = verticalConfig.terminology.pipeline || 'Pipeline'
     const { data: pipeline, error: pipelineError } = await supabase
       .from('pipelines')
       .insert({
@@ -110,8 +110,8 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (!pipelineError && pipeline) {
-      // Create default pipeline stages based on industry
-      const defaultStages = industryConfig.defaultPipelineStages
+      // Create default pipeline stages based on vertical
+      const defaultStages = verticalConfig.defaultPipelineStages
 
       await supabase.from('pipeline_stages').insert(
         defaultStages.map((stage) => ({
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
           pipeline_id: pipeline.id,
         }))
       )
-      console.log(`Created ${defaultStages.length} pipeline stages for ${industryConfig.id} industry`)
+      console.log(`Created ${defaultStages.length} pipeline stages for ${verticalConfig.id} vertical`)
     }
 
     // Seed default automations for this industry

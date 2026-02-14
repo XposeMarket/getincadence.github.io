@@ -8,7 +8,6 @@ import RevenueRadarMap from "@/components/maps/RevenueRadarMap";
 import LeadSidePanel from "@/components/prospector/LeadSidePanel";
 import {
   getRadarConfig,
-  RADAR_CONFIGS,
   type RadarIndustryType,
   type RadarIndustryConfig,
   getScoreColor,
@@ -16,82 +15,26 @@ import {
 import { TRADE_PROFILES, type ResidentialTrade } from "@/lib/radar/trade-profiles";
 import { PHOTO_NICHE_PROFILES, type PhotographerNiche } from "@/lib/radar/photo-niches";
 import { useIndustry } from "@/lib/contexts/IndustryContext";
+import { getEffectiveProspectorConfig, type ProspectorConfig } from "@/lib/verticals";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function mapCrmToRadarIndustry(crmIndustry: string): RadarIndustryType {
+  // Legacy mapping for orgs without prospector_config.
+  // New orgs use getEffectiveProspectorConfig() instead.
   const map: Record<string, RadarIndustryType> = {
-    default: "residential_service",
+    default: "b2b_service",
     photographer: "photographer",
     service_professional: "b2b_service",
+    roofing: "residential_service",
+    solar: "residential_service",
+    hvac: "residential_service",
+    remodeling: "residential_service",
+    plumbing: "residential_service",
+    general_contractor: "residential_service",
+    barbershop: "b2b_service",
   };
   return map[crmIndustry] || "residential_service";
-}
-
-// ─── Industry Selector ────────────────────────────────────────────────────────
-
-function IndustrySelector({
-  value,
-  onChange,
-}: {
-  value: RadarIndustryType;
-  onChange: (v: RadarIndustryType) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const options: RadarIndustryType[] = [
-    "residential_service", "b2b_service", "commercial_service", "retail", "photographer",
-  ];
-
-  const current = RADAR_CONFIGS[value];
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium 
-          bg-gray-800/70 text-gray-300 border border-gray-700/50 hover:bg-gray-700/60 
-          hover:text-gray-200 transition-all"
-      >
-        <Radar size={13} />
-        <span>{current?.label || "Select Industry"}</span>
-        <ChevronDown size={12} className={`transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-      {open && (
-        <div
-          className="absolute left-0 top-full mt-1 z-50 min-w-[220px] py-1 rounded-xl 
-            bg-gray-900/95 border border-gray-700/50 backdrop-blur-lg shadow-2xl"
-        >
-          {options.map((key) => {
-            const cfg = RADAR_CONFIGS[key];
-            return (
-              <button
-                key={key}
-                onClick={() => { onChange(key); setOpen(false); }}
-                className={`w-full text-left px-3 py-2 text-sm flex flex-col gap-0.5 transition-colors ${
-                  value === key
-                    ? "bg-primary-500/10 text-primary-400"
-                    : "text-gray-300 hover:bg-gray-800/70"
-                }`}
-              >
-                <span className="font-medium">{cfg.label}</span>
-                <span className="text-[11px] text-gray-500">{cfg.description}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
 }
 
 // ─── Trade Selector (Residential sub-type) ──────────────────────────────────
@@ -231,13 +174,21 @@ export default function ProspectorPage() {
   const { industryType: crmIndustry } = useIndustry();
 
   // State
-  const [radarIndustry, setRadarIndustry] = useState<RadarIndustryType>(
-    mapCrmToRadarIndustry(crmIndustry)
-  );
+  // Resolve initial radar mode from vertical config
+  const initialRadarMode = mapCrmToRadarIndustry(crmIndustry) as RadarIndustryType;
+  // Map vertical ID to a sensible default trade
+  const verticalTradeMap: Record<string, ResidentialTrade> = {
+    roofing: 'roofing', solar: 'solar', hvac: 'hvac',
+    remodeling: 'remodeling', plumbing: 'plumbing_electrical',
+    general_contractor: 'general',
+  };
+  const initialTrade = verticalTradeMap[crmIndustry] || 'general';
+
+  const [radarIndustry, setRadarIndustry] = useState<RadarIndustryType>(initialRadarMode);
   const [radarConfig, setRadarConfig] = useState<RadarIndustryConfig>(
-    getRadarConfig(radarIndustry)
+    getRadarConfig(initialRadarMode)
   );
-  const [selectedTrade, setSelectedTrade] = useState<ResidentialTrade>("general");
+  const [selectedTrade, setSelectedTrade] = useState<ResidentialTrade>(initialTrade);
   const [selectedNiche, setSelectedNiche] = useState<PhotographerNiche>("general_photo");
   const [selectedLead, setSelectedLead] = useState<any>(null);
   const [radius, setRadius] = useState(15);
@@ -410,7 +361,11 @@ export default function ProspectorPage() {
                 borderColor: "rgba(55, 65, 81, 0.4)",
               }}
             >
-              <IndustrySelector value={radarIndustry} onChange={setRadarIndustry} />
+              {/* Radar mode label (configured in Settings > Organization > Prospector) */}
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-800/70 text-gray-300 border border-gray-700/50">
+                <Radar size={13} />
+                <span>{radarConfig?.label || "Prospector"}</span>
+              </div>
 
               {radarIndustry === "residential_service" && (
                 <TradeSelector value={selectedTrade} onChange={setSelectedTrade} />

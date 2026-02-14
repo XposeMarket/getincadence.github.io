@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import { getPermissions, UserRole } from '@/lib/permissions'
-import { getTerminology, getIndustryFeatures, IndustryType } from '@/lib/industry-config'
+import { getTerminology, getFeatures, VerticalId } from '@/lib/verticals'
 
 interface SidebarProps {
   user: {
@@ -33,6 +33,7 @@ interface SidebarProps {
       id: string
       name: string
       industry_type?: string
+      prospector_enabled?: boolean | null
     }
   }
   isOpen?: boolean
@@ -44,7 +45,7 @@ interface NavItem {
   href: string
   icon: LucideIcon
   adminOnly?: boolean
-  requireFeature?: 'showCompanies'
+  requireFeature?: 'showCompanies' | 'showProspector'
 }
 
 // Get navigation items based on industry terminology
@@ -57,7 +58,7 @@ function getNavigation(terminology: ReturnType<typeof getTerminology>): NavItem[
     { name: terminology.deals, href: '/deals', icon: Handshake },
     { name: terminology.tasks, href: '/tasks', icon: CheckSquare },
     { name: terminology.reports, href: '/reports', icon: BarChart3, adminOnly: true },
-    { name: 'Prospector', href: '/prospector', icon: Zap },
+    { name: 'Prospector', href: '/prospector', icon: Zap, requireFeature: 'showProspector' },
   ]
 }
 
@@ -71,9 +72,13 @@ const secondaryNav: NavItem[] = [
 export default function Sidebar({ user, isOpen = true, onClose }: SidebarProps) {
   const pathname = usePathname()
   const permissions = getPermissions(user.role as UserRole)
-  const industryType = (user.orgs.industry_type as IndustryType) || 'default'
+  const industryType = (user.orgs.industry_type as VerticalId) || 'default'
   const terminology = getTerminology(industryType)
-  const features = getIndustryFeatures(industryType)
+  const features = getFeatures(industryType)
+  // Prospector visibility: check org-level override first, then vertical default
+  const prospectorVisible = user.orgs.prospector_enabled !== null && user.orgs.prospector_enabled !== undefined
+    ? user.orgs.prospector_enabled
+    : features.showProspector
   const navigation = getNavigation(terminology)
 
   const handleLinkClick = () => {
@@ -85,6 +90,9 @@ export default function Sidebar({ user, isOpen = true, onClose }: SidebarProps) 
   const filteredNavigation = navigation.filter(item => {
     // Check feature requirements
     if (item.requireFeature === 'showCompanies' && !features.showCompanies) {
+      return false
+    }
+    if (item.requireFeature === 'showProspector' && !prospectorVisible) {
       return false
     }
     if (item.adminOnly) {

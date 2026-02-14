@@ -6,7 +6,9 @@ import { useRouter } from 'next/navigation'
 import { User, Building2, Users, CreditCard, Bell, Shield, Palette, Check, Loader2, AlertCircle, Lock, ArrowUpRight, Crown, X, Trash2, ShieldCheck, Eye, RefreshCw, CheckSquare as CheckSquareIcon, FileText, Copy, ExternalLink, Upload, ImageIcon } from 'lucide-react'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
 import { getPermissions, UserRole } from '@/lib/permissions'
-import { INDUSTRY_CONFIGS, IndustryType, getIndustryConfig } from '@/lib/industry-config'
+import { VERTICALS, VERTICAL_CATEGORIES, VerticalId, getVertical, PROSPECTOR_MODES, type ProspectorConfig } from '@/lib/verticals'
+import { TRADE_PROFILES } from '@/lib/radar/trade-profiles'
+import { PHOTO_NICHE_PROFILES } from '@/lib/radar/photo-niches'
 
 type SettingsTab = 'profile' | 'organization' | 'lead_form' | 'team' | 'billing' | 'notifications' | 'security' | 'appearance'
 type AccentColor = '#E91E8C' | '#3B82F6' | '#10B981' | '#F59E0B' | '#8B5CF6'
@@ -731,6 +733,7 @@ function OrganizationSettings({ canEdit = true }: { canEdit?: boolean }) {
 
       {/* Industry Type Section */}
       {canEdit && <IndustryTypeSettings />}
+      {canEdit && <ProspectorSettings />}
     </div>
   )
 }
@@ -742,8 +745,8 @@ function IndustryTypeSettings() {
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [orgId, setOrgId] = useState<string | null>(null)
-  const [currentIndustryType, setCurrentIndustryType] = useState<IndustryType>('default')
-  const [selectedIndustryType, setSelectedIndustryType] = useState<IndustryType>('default')
+  const [currentIndustryType, setCurrentIndustryType] = useState<VerticalId>('default')
+  const [selectedIndustryType, setSelectedIndustryType] = useState<VerticalId>('default')
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const supabase = createClient()
   const router = useRouter()
@@ -781,8 +784,8 @@ function IndustryTypeSettings() {
       .single()
 
     if (org?.industry_type) {
-      setCurrentIndustryType(org.industry_type as IndustryType)
-      setSelectedIndustryType(org.industry_type as IndustryType)
+      setCurrentIndustryType(org.industry_type as VerticalId)
+      setSelectedIndustryType(org.industry_type as VerticalId)
     }
 
     setLoading(false)
@@ -824,8 +827,8 @@ function IndustryTypeSettings() {
 
       if (deleteError) throw deleteError
 
-      // Get the new stages from industry config
-      const industryConfig = getIndustryConfig(selectedIndustryType)
+      // Get the new stages from vertical config
+      const industryConfig = getVertical(selectedIndustryType)
       
       // Insert new stages (pipeline_stages doesn't have org_id, only pipeline_id)
       const newStages = industryConfig.defaultPipelineStages.map(stage => ({
@@ -873,7 +876,7 @@ function IndustryTypeSettings() {
     )
   }
 
-  const industryConfig = getIndustryConfig(selectedIndustryType)
+  const industryConfig = getVertical(selectedIndustryType)
 
   return (
     <div className="border-t border-gray-200 pt-6 mt-6">
@@ -903,14 +906,18 @@ function IndustryTypeSettings() {
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Industry Type</label>
           <select
             value={selectedIndustryType}
-            onChange={(e) => setSelectedIndustryType(e.target.value as IndustryType)}
+            onChange={(e) => setSelectedIndustryType(e.target.value as VerticalId)}
             className="input max-w-xs"
             disabled={resetting}
           >
-            {Object.values(INDUSTRY_CONFIGS).map((config) => (
-              <option key={config.id} value={config.id}>
-                {config.label}
-              </option>
+            {Object.entries(VERTICAL_CATEGORIES).map(([catId, cat]) => (
+              <optgroup key={catId} label={cat.label}>
+                {cat.verticals.map((vId) => (
+                  <option key={vId} value={vId}>
+                    {VERTICALS[vId].label}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
           <p className="text-xs text-gray-500 mt-1.5">{industryConfig.description}</p>
@@ -1031,6 +1038,300 @@ function IndustryTypeSettings() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function ProspectorSettings() {
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [success, setSuccess] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [orgId, setOrgId] = useState<string | null>(null)
+  const [industryType, setIndustryType] = useState<string>('default')
+  const [prospectorEnabled, setProspectorEnabled] = useState<boolean | null>(null)
+  const [radarMode, setRadarMode] = useState<string>('residential_service')
+  const [trade, setTrade] = useState<string | null>(null)
+  const [defaultRadius, setDefaultRadius] = useState<number>(30)
+  const [defaultSignals, setDefaultSignals] = useState<Record<string, boolean>>({})
+  const [hasCustomConfig, setHasCustomConfig] = useState(false)
+  const supabase = createClient()
+
+  useEffect(() => {
+    loadProspectorSettings()
+  }, [])
+
+  const loadProspectorSettings = async () => {
+    setLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setLoading(false); return }
+
+    const { data: userProfile } = await supabase
+      .from('users')
+      .select('org_id')
+      .eq('id', user.id)
+      .single()
+
+    if (!userProfile?.org_id) { setLoading(false); return }
+    setOrgId(userProfile.org_id)
+
+    const { data: org } = await supabase
+      .from('orgs')
+      .select('industry_type, prospector_enabled, prospector_config')
+      .eq('id', userProfile.org_id)
+      .single()
+
+    if (org) {
+      setIndustryType(org.industry_type || 'default')
+      setProspectorEnabled(org.prospector_enabled)
+
+      if (org.prospector_config) {
+        const config = org.prospector_config as ProspectorConfig
+        setRadarMode(config.radar_mode || 'residential_service')
+        setTrade(config.trade || null)
+        setDefaultRadius(config.default_radius_miles || 30)
+        setDefaultSignals(config.default_signals || {})
+        setHasCustomConfig(true)
+      } else {
+        // Set defaults from the vertical's radar config
+        const vertical = getVertical(org.industry_type || 'default')
+        if (vertical.radar) {
+          setRadarMode(vertical.radar.radarMode)
+          setTrade(vertical.radar.defaultTrade)
+          setDefaultRadius(vertical.radar.maxRadiusMiles)
+          const signals: Record<string, boolean> = {}
+          vertical.radar.signals.forEach(s => { signals[s.id] = s.defaultOn })
+          setDefaultSignals(signals)
+        }
+      }
+    }
+    setLoading(false)
+  }
+
+  const handleSave = async () => {
+    if (!orgId) return
+    setSaving(true)
+    setError(null)
+    setSuccess(false)
+
+    try {
+      const prospectorConfig: ProspectorConfig = {
+        radar_mode: radarMode,
+        trade,
+        default_radius_miles: defaultRadius,
+        default_signals: defaultSignals,
+      }
+
+      const { error: updateError } = await supabase
+        .from('orgs')
+        .update({
+          prospector_enabled: prospectorEnabled,
+          prospector_config: prospectorConfig,
+        })
+        .eq('id', orgId)
+
+      if (updateError) throw updateError
+
+      setHasCustomConfig(true)
+      setSuccess(true)
+      setTimeout(() => setSuccess(false), 3000)
+    } catch (err: any) {
+      console.error('Save prospector settings error:', err)
+      setError(err.message || 'Failed to save settings')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Determine the effective enabled state
+  const verticalDefault = getVertical(industryType).features.showProspector
+  const isEnabled = prospectorEnabled !== null ? prospectorEnabled : verticalDefault
+
+  // Get available trades/niches based on radar mode
+  const tradeOptions = radarMode === 'residential_service'
+    ? Object.values(TRADE_PROFILES).map(t => ({ id: t.id, label: t.label }))
+    : radarMode === 'photographer'
+    ? Object.values(PHOTO_NICHE_PROFILES).map(n => ({ id: n.id, label: n.label }))
+    : []
+
+  // Get signals for the selected radar mode
+  const modeVertical = Object.values(VERTICALS).find(v => v.radar?.radarMode === radarMode)
+  const availableSignals = modeVertical?.radar?.signals || []
+
+  if (loading) {
+    return (
+      <div className="border-t border-gray-200 pt-6 mt-6">
+        <div className="flex items-center justify-center py-8">
+          <LoadingSpinner size="sm" />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="border-t border-gray-200 pt-6 mt-6">
+      <div className="mb-4">
+        <h3 className="text-base font-semibold text-gray-900">Prospector / Lead Finder</h3>
+        <p className="text-sm text-gray-500 mt-1">
+          Configure the Prospector map tool for finding new leads in your area
+        </p>
+      </div>
+
+      {error && (
+        <div className="mb-4 p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
+          <AlertCircle size={16} />
+          {error}
+        </div>
+      )}
+
+      {success && (
+        <div className="mb-4 p-3 text-sm text-green-600 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
+          <Check size={16} />
+          Prospector settings saved!
+        </div>
+      )}
+
+      <div className="space-y-4">
+        {/* Enable/Disable Toggle */}
+        <div className="flex items-center justify-between bg-gray-50 rounded-lg p-4">
+          <div>
+            <p className="text-sm font-medium text-gray-900">Enable Prospector</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {verticalDefault
+                ? 'Enabled by default for your industry'
+                : 'Not included by default for your industry — enable to access the lead finder map'
+              }
+            </p>
+          </div>
+          <button
+            onClick={() => setProspectorEnabled(isEnabled ? false : true)}
+            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+              isEnabled ? 'bg-primary-600' : 'bg-gray-200'
+            }`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                isEnabled ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
+
+        {isEnabled && (
+          <>
+            {/* Prospecting Mode */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Prospecting Mode</label>
+              <select
+                value={radarMode}
+                onChange={(e) => {
+                  setRadarMode(e.target.value)
+                  setTrade(null)
+                  // Reset signals to the new mode's defaults
+                  const newModeVertical = Object.values(VERTICALS).find(v => v.radar?.radarMode === e.target.value)
+                  if (newModeVertical?.radar) {
+                    const signals: Record<string, boolean> = {}
+                    newModeVertical.radar.signals.forEach(s => { signals[s.id] = s.defaultOn })
+                    setDefaultSignals(signals)
+                    setDefaultRadius(newModeVertical.radar.maxRadiusMiles)
+                  }
+                }}
+                className="input max-w-sm"
+              >
+                {PROSPECTOR_MODES.map(mode => (
+                  <option key={mode.id} value={mode.id}>{mode.label}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                {PROSPECTOR_MODES.find(m => m.id === radarMode)?.description}
+              </p>
+            </div>
+
+            {/* Trade/Niche Sub-selector */}
+            {tradeOptions.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  {radarMode === 'photographer' ? 'Photography Niche' : 'Trade Specialty'}
+                </label>
+                <select
+                  value={trade || ''}
+                  onChange={(e) => setTrade(e.target.value || null)}
+                  className="input max-w-sm"
+                >
+                  <option value="">All / General</option>
+                  {tradeOptions.map(opt => (
+                    <option key={opt.id} value={opt.id}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Default Radius */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Default Search Radius: {defaultRadius} miles
+              </label>
+              <input
+                type="range"
+                min={5}
+                max={radarMode === 'residential_service' ? 50 : 30}
+                value={defaultRadius}
+                onChange={(e) => setDefaultRadius(Number(e.target.value))}
+                className="w-full max-w-sm"
+              />
+              <div className="flex justify-between text-xs text-gray-400 max-w-sm">
+                <span>5 mi</span>
+                <span>{radarMode === 'residential_service' ? '50' : '30'} mi</span>
+              </div>
+            </div>
+
+            {/* Default Signals */}
+            {availableSignals.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Default Signal Filters</label>
+                <div className="space-y-2">
+                  {availableSignals.map(signal => (
+                    <label key={signal.id} className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={defaultSignals[signal.id] ?? signal.defaultOn}
+                        onChange={(e) => setDefaultSignals(prev => ({ ...prev, [signal.id]: e.target.checked }))}
+                        className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                      />
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full"
+                          style={{ backgroundColor: signal.color }}
+                        />
+                        <span className="text-sm text-gray-700">{signal.label}</span>
+                        <span className="text-xs text-gray-400">— {signal.description}</span>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Save Button */}
+            <div className="pt-2">
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="btn btn-primary"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin mr-2" />
+                    Saving...
+                  </>
+                ) : (
+                  'Save Prospector Settings'
+                )}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }

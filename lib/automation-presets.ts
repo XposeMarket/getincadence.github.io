@@ -8,7 +8,7 @@
  * If a matching automation is found with is_active = true, the actions execute.
  */
 
-import { IndustryType } from '@/lib/industry-config'
+import { VerticalId, getVerticalCategory } from '@/lib/verticals'
 
 // ============================================
 // TYPES
@@ -34,8 +34,12 @@ export interface AutomationPreset {
   trigger_type: string
   trigger_config: Record<string, any>
   actions: AutomationAction[]
-  /** Which industry types this preset applies to */
-  target: 'all' | IndustryType
+  /** Which verticals this preset applies to.
+   *  'all' = every vertical.
+   *  A VerticalId = only that specific vertical.
+   *  'category:xyz' = all verticals in that category.
+   */
+  target: 'all' | VerticalId | `category:${string}`
   /** Whether this preset is enabled by default when seeded */
   default_enabled: boolean
   /** Display metadata for the automations page */
@@ -466,27 +470,26 @@ export const ALL_PRESETS: AutomationPreset[] = [
   ...SERVICE_PROFESSIONAL_PRESETS,
 ]
 
-/** Get all presets that should be seeded for a given industry type */
-export function getPresetsForIndustry(industryType: IndustryType | string): AutomationPreset[] {
-  const globalPresets = GLOBAL_PRESETS
+/** Get all presets that should be seeded for a given vertical */
+export function getPresetsForIndustry(verticalId: VerticalId | string): AutomationPreset[] {
+  const category = getVerticalCategory(verticalId)
+  const allPresets = [...GLOBAL_PRESETS, ...PHOTOGRAPHER_PRESETS, ...SERVICE_PROFESSIONAL_PRESETS]
 
-  switch (industryType) {
-    case 'photographer':
-      return [...globalPresets, ...PHOTOGRAPHER_PRESETS]
-    case 'service_professional':
-      return [...globalPresets, ...SERVICE_PROFESSIONAL_PRESETS]
-    default:
-      return globalPresets
-  }
+  return allPresets.filter(preset => {
+    if (preset.target === 'all') return true
+    if (preset.target === verticalId) return true
+    if (preset.target === `category:${category}`) return true
+    return false
+  })
 }
 
 /** Get presets NOT currently in the org's automations — for the "Suggested" section */
 export function getUnsuggestedPresets(
-  industryType: IndustryType | string,
+  verticalId: VerticalId | string,
   existingPresetIds: string[]
 ): AutomationPreset[] {
-  const allForIndustry = getPresetsForIndustry(industryType)
-  return allForIndustry.filter(p => !existingPresetIds.includes(p.preset_id))
+  const allForVertical = getPresetsForIndustry(verticalId)
+  return allForVertical.filter(p => !existingPresetIds.includes(p.preset_id))
 }
 
 /** Find a preset by its ID */
@@ -495,8 +498,8 @@ export function getPresetById(presetId: string): AutomationPreset | undefined {
 }
 
 /** Build automations table rows for seeding */
-export function buildSeedRows(orgId: string, industryType: IndustryType | string) {
-  const presets = getPresetsForIndustry(industryType)
+export function buildSeedRows(orgId: string, verticalId: VerticalId | string) {
+  const presets = getPresetsForIndustry(verticalId)
 
   return presets
     .filter(p => p.default_enabled)

@@ -6,14 +6,14 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
 import LoadingSpinner from '@/components/shared/LoadingSpinner'
-import { INDUSTRY_CONFIGS, IndustryType } from '@/lib/industry-config'
+import { VERTICALS, VERTICAL_CATEGORIES, VerticalId } from '@/lib/verticals'
 
 function SignupForm() {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [orgName, setOrgName] = useState('')
-  const [industryType, setIndustryType] = useState<IndustryType>('default')
+  const [industryType, setIndustryType] = useState<VerticalId>('default')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -209,18 +209,22 @@ function SignupForm() {
           <select
             id="industryType"
             value={industryType}
-            onChange={(e) => setIndustryType(e.target.value as IndustryType)}
+            onChange={(e) => setIndustryType(e.target.value as VerticalId)}
             className="input"
             disabled={loading}
           >
-            {Object.values(INDUSTRY_CONFIGS).map((config) => (
-              <option key={config.id} value={config.id}>
-                {config.label}
-              </option>
+            {Object.entries(VERTICAL_CATEGORIES).map(([catId, cat]) => (
+              <optgroup key={catId} label={cat.label}>
+                {cat.verticals.map((vId) => (
+                  <option key={vId} value={vId}>
+                    {VERTICALS[vId].label}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
           <p className="mt-1.5 text-xs text-gray-500">
-            {INDUSTRY_CONFIGS[industryType].description}
+            {VERTICALS[industryType].description}
           </p>
         </div>
 

@@ -1,27 +1,29 @@
 'use client'
 
 import { createContext, useContext, ReactNode } from 'react'
-import { getIndustryConfig, getTerminology, IndustryType, IndustryConfig } from '@/lib/industry-config'
+import { getVertical, getTerminology, getFeatures, VerticalId, VerticalDefinition, Terminology, FeatureFlags } from '@/lib/verticals'
 
 interface IndustryContextType {
-  industryType: IndustryType
-  config: IndustryConfig
-  terminology: ReturnType<typeof getTerminology>
+  industryType: VerticalId | string
+  config: VerticalDefinition
+  terminology: Terminology
+  features: FeatureFlags
 }
 
 const IndustryContext = createContext<IndustryContextType | null>(null)
 
 interface IndustryProviderProps {
-  industryType: IndustryType
+  industryType: VerticalId | string
   children: ReactNode
 }
 
 export function IndustryProvider({ industryType, children }: IndustryProviderProps) {
-  const config = getIndustryConfig(industryType)
+  const config = getVertical(industryType)
   const terminology = getTerminology(industryType)
+  const features = getFeatures(industryType)
 
   return (
-    <IndustryContext.Provider value={{ industryType, config, terminology }}>
+    <IndustryContext.Provider value={{ industryType, config, terminology, features }}>
       {children}
     </IndustryContext.Provider>
   )
@@ -36,12 +38,12 @@ export function useIndustry() {
   
   if (!context) {
     // Return default industry config if provider not found
-    // This allows pages to work even without the provider
-    const defaultConfig = getIndustryConfig('default')
+    const defaultConfig = getVertical('default')
     return {
-      industryType: 'default' as IndustryType,
+      industryType: 'default' as VerticalId,
       config: defaultConfig,
       terminology: getTerminology('default'),
+      features: getFeatures('default'),
     }
   }
   

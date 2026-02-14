@@ -5,7 +5,7 @@ import Sidebar from '@/components/dashboard/Sidebar'
 import Header from '@/components/dashboard/Header'
 import { IndustryProvider } from '@/lib/contexts/IndustryContext'
 import { UsageLimitsProvider } from '@/lib/contexts/UsageLimitsContext'
-import { IndustryType } from '@/lib/industry-config'
+import { VerticalId } from '@/lib/verticals'
 
 interface DashboardShellProps {
   user: {
@@ -17,6 +17,7 @@ interface DashboardShellProps {
       id: string
       name: string
       industry_type?: string
+      prospector_enabled?: boolean | null
     }
   }
   children: React.ReactNode
@@ -24,7 +25,7 @@ interface DashboardShellProps {
 
 export default function DashboardShell({ user, children }: DashboardShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const industryType = (user.orgs.industry_type as IndustryType) || 'default'
+  const industryType = (user.orgs.industry_type as VerticalId) || 'default'
 
   return (
     <IndustryProvider industryType={industryType}>

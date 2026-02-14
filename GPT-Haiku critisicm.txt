@@ -1,0 +1,4253 @@
+Good. This is exactly how you should be using Haiku.
+
+You don’t want generic “add dark mode” advice.
+You want strategic product analysis based on your actual codebase.
+
+Below is a high-precision prompt designed specifically for Claude Haiku to:
+
+Analyze your codespace
+
+Understand architecture
+
+Identify weaknesses
+
+Suggest leverage improvements
+
+Not hallucinate random features
+
+Think like a product strategist + engineer
+
+Paste this into Haiku inside your codespace.
+
+🔥 Strategic Codespace Audit Prompt (For Claude Haiku)
+You are acting as a senior product strategist + senior full-stack engineer.
+
+Your task is to analyze this entire codespace and identify:
+
+1) Structural weaknesses
+2) Architectural bottlenecks
+3) Product gaps
+4) Feature opportunities
+5) Monetization leverage points
+6) Scalability concerns
+7) UX friction points
+8) Industry-specific expansion opportunities
+
+IMPORTANT:
+- Do NOT give generic startup advice.
+- Do NOT suggest obvious beginner improvements.
+- Base your suggestions only on what actually exists in this codebase.
+- Analyze patterns, components, data flow, and architecture before suggesting changes.
+- If you are unsure about something, ask clarifying questions instead of guessing.
+
+Phase 1 — Codebase Understanding:
+First, summarize:
+- Tech stack
+- Core modules
+- Data architecture
+- Map system implementation
+- Lead scoring logic structure
+- Industry adaptation system
+- API interaction patterns
+- State management patterns
+
+Be specific.
+
+Phase 2 — Product Evaluation:
+Based on the actual implementation, answer:
+
+- What is this platform REALLY optimized for right now?
+- What industry does it unintentionally favor?
+- Where does the logic feel overfit?
+- What parts are underdeveloped?
+- What is fragile?
+- What will break at scale?
+
+Phase 3 — Strategic Improvements:
+Suggest improvements in categories:
+
+A) Performance Improvements
+B) Data Intelligence Improvements
+C) Industry Expansion Enhancements
+D) UI/UX Structural Improvements (not cosmetic)
+E) Feature Additions That Increase Retention
+F) Feature Additions That Increase Monetization
+G) Automation Opportunities
+H) Competitive Differentiation
+
+Each suggestion must:
+- Explain why it matters
+- Explain technical feasibility
+- Explain complexity (Low / Medium / High)
+- Explain expected impact
+
+Phase 4 — “Lock-In” Strategy:
+How can this platform create:
+- High switching costs?
+- Unique data advantage?
+- Network effects?
+- Retention loops?
+- Industry-specific moat?
+
+Do not suggest paid APIs unless clearly justified.
+Prefer leveraging existing architecture and public data.
+
+Phase 5 — Ruthless Honesty:
+If something is poorly structured, say it clearly.
+If something is overengineered, say it clearly.
+If something is missing that prevents scale, say it clearly.
+
+Your role is not to flatter.
+Your role is to sharpen this platform strategically.
+
+Respond in structured sections with headings.
+
+Why This Prompt Works
+
+It forces Haiku to:
+
+Actually analyze before advising
+
+Think systemically
+
+Think monetization
+
+Think retention
+
+Think architecture
+
+Avoid generic fluff
+
+If You Want It Even More Aggressive
+
+You can append this:
+
+Also identify the 3 biggest mistakes currently in the platform that would prevent it from becoming a serious SaaS product.
+
+
+That tends to surface uncomfortable but useful truths.
+
+When Haiku responds, paste the output here.
+
+I’ll help you interpret it and decide what actually matters vs what’s noise.
+
+summarize this into each category in both regular terms and layman terms - # CADENCE CRM — STRATEGIC AUDIT & COMPETITIVE ROADMAP
+## Senior Product + Engineering Analysis
+
+**Analysis Date:** February 2026  
+**Codebase Scope:** Next.js 14, TypeScript, Supabase, Tailwind  
+**Verdict:** Solid foundational architecture with critical positioning weaknesses. Significant upside if executed strategically.
+
+---
+
+## PHASE 1: CODEBASE UNDERSTANDING
+
+### Tech Stack
+- **Frontend:** Next.js 14 + React 18, TypeScript, Tailwind CSS, MapLibre GL
+- **Backend:** Supabase (PostgreSQL + Auth) with Server-Sde helpers
+- **Payment:** Stripe SDK (integrated for subscriptions)
+- **Real-time:** Supabase RLS + client/server Supabase instances
+- **Maps:** MapLibre GL (self-hosted alternative to Google Maps)
+- **File Storage:** Supabase Storage
+- **Monitoring:** Activity logging (in-app audit trail)
+
+### Core Modules Structure
+
+
+lib/
+  ├── industry-config.ts        // Config layer for industry switching
+  ├── automation-engine.ts       // Trigger-action automation system
+  ├── radar-config.ts            // Prospecting map configurations
+  ├── activity-logger.ts         // Audit trail logging
+  ├── permissions.ts             // RBAC (admin/member)
+  ├── org-helpers.ts             // Multi-tenancy utilities
+  └── supabase/                  // DB client abstractions
+
+components/
+  ├── communications/            // Call/Email/SMS/Note logging
+  ├── deals/                      // Deal management UI
+  ├── contacts/                   // Contact management
+  ├── automations/                // Workflow builder
+  ├── prospector/                 // Lead mapping/scouting
+  ├── reports/                    // Analytics dashboards
+  ├── maps/                        // MapLibre integration
+  └── shared/                      // Reusable UI components
+
+app/
+  ├── (dashboard)/                // All authenticated pages
+  │   ├── deals/[id]              // Deal detail (rich)
+  │   ├── prospector/             // Lead mapping interface
+  │   ├── automations/            // Automation builder
+  │   ├── reports/                // Sales analytics
+  │   └── dashboard/              // Activity feed
+  └── api/                         // Backend routes
+      ├── deals/                   // Deal CRUD + stage changes
+      ├── automations/             // Automation triggers
+      ├── stripe/                  // Subscription webhooks
+      └── intake/                  // Lead intake forms
+
+
+### Data Architecture
+
+**Multi-Tenancy Model:**
+- Organizations (orgs) as top-level isolation
+- All tables have org_id foreign key
+- RLS policies enforce org-level isolation
+- Row Level Security is enabled but policies are loose ("allow all" for dev)
+
+**Core Entities:**
+
+orgs (1) → users (many)
+orgs (1) → pipelines (many) → pipeline_stages (many)
+orgs (1) → contacts (many)
+orgs (1) → deals (many) ← relates to contacts, stages
+orgs (1) → tasks (many) ← relates to deals, contacts
+orgs (1) → activities (many) ← audit trail
+orgs (1) → automations (many) ← trigger definitions
+orgs (1) → communications (many) ← calls, emails, SMS, notes
+
+
+**Key Observation:** This is a normalized, dependency-injection friendly schema. No denormalization for performance (yet). Good for correctness, may need optimization at scale.
+
+### Industry Adaptation System
+
+**Three-Tier Abstraction:**
+
+1. **Industry Config (lib/industry-config.ts):**
+   - Defines terminology per industry (default, photographer, service_professional)
+   - Controls feature flags (showReports, showForecast, etc.)
+   - Specifies default pipeline stages + task templates
+   - Currently: 3 industry types hardcoded
+
+2. **Radar Config (lib/radar-config.ts):**
+   - Separate prospecting configuration
+   - 9 radar industry types (roofing, solar, hvac, b2b_service, commercial_service, retail, photographer, default)
+   - Defines data sources, signals, map layers, scoring factors per vertical
+   - More granular than CRM industry types
+
+3. **Permissions (lib/permissions.ts):**
+   - Simple admin/member two-tier RBAC
+   - Feature gates: canAccessReports, canAccessAutomations, etc.
+   - Hardcoded logic (not data-driven)
+
+**Weakness:** Industry types are hardcoded. Adding a new vertical requires code changes + migrations. No UI for adding industry templates. Radar types don't sync with CRM types.
+
+### Automation Engine (lib/automation-engine.ts)
+
+**Architecture:**
+- Database-driven: automations stored in automations table
+- Triggers: 8 types (contact_created, deal_created, deal_stage_changed, deal_won, deal_lost, task_completed, deal_idle_7_days, task_overdue)
+- Actions: 2 types (create_task, send_notification) — notification is stubbed
+- Conditions: Flexible user-defined conditions (stage_is, value_greater_than, etc.)
+- Context: Template interpolation system ({{dealName}}, {{contactName}}, etc.)
+
+**Execution:**
+- Inline execution on event (e.g., onDealStageChanged called from UI)
+- Deduplication: 5-minute window to prevent duplicate fires
+- Logging: automation_logs table tracks execution
+- Server-side: onDealIdle7Days requires server Supabase client (cron-ready)
+
+**Weakness:** 
+- Conditions are hardcoded in engine (not extensible)
+- Only 2 action types, notification is unimplemented
+- No conditional branching (if-then-else chains)
+- No delay/scheduling (always immediate)
+- No API call actions (can't trigger webhooks to external services)
+
+### Activity Logger & Communications
+
+**Activity Logger (lib/activity-logger.ts):**
+- 15 activity types (contact_created, deal_stage_changed, task_completed, note_added, etc.)
+- Metadata JSONB for rich context
+- Audit trail: who did what, when, to whom
+- Tied to deal/contact/task entities
+
+**Communications (components/communications/ + types/communications.ts):**
+- Three input modals: LogCallModal, LogEmailModal, LogNoteModal
+- Call flow: Desktop quick-select duration, Mobile native call + auto-duration
+- Email flow: Open email client via mailto:, log metadata after
+- Timeline view with type filtering
+- Three-dot menu for edit/delete
+- Soft delete support
+
+**Strength:** This is well-architected. Call duration estimation via Page Visibility API is clever. Mailto opening is pragmatic.
+
+### State Management
+
+**No Redux/Zustand detected.** Using:
+- React Context (IndustryContext, UsageLimitsContext)
+- Local component state (useState)
+- Supabase client for data fetching
+- URL params for navigation
+
+**Assessment:** Minimal but adequate for current app size. Would need refactoring at 50+ pages.
+
+### Data Flow Patterns
+
+Example: Changing a deal's stage:
+1. UI calls fetch(/api/deals/${dealId}/stage-change)
+2. API updates deals table, triggers automation engine
+3. Engine queries active automations, matches stage-change trigger
+4. Executes actions (create tasks), logs execution
+5. Activity logger records "deal stage changed"
+6. Component refetches deal + activities
+
+**Observation:** All data mutations go through API routes (good). Activity logging is called manually from components (not automatic). Communications are logged via explicit modal saves, not intercepted from actual email/SMS sends.
+
+---
+
+## PHASE 2: PRODUCT EVALUATION
+
+### What This Platform is REALLY Optimized For
+
+**Primary User:** Solo/small team service business owner (1-5 reps)
+- Roofing, solar, HVAC, landscaping, photography, consulting
+- Location-based prospecting + pipeline management
+- Simple task automation (auto-create follow-up tasks on stage changes)
+
+**Secondary User:** B2B service companies (SaaS, agencies, consulting)
+- Prospecting new clients in a geographic area
+- Managing multiple deals per contact
+- Reporting on sales velocity
+
+**Actual Strengths:**
+1. **Industry switching without data loss** — Same core CRM, different terminology
+2. **Geospatial lead discovery** — Prospector lead mapper with scoring
+3. **Visual pipeline** — Familiar kanban-style stage management
+4. **Lightweight automation** — Triggers + auto-task creation
+5. **Multi-user with org isolation** — Proper multi-tenancy
+6. **Subscription-ready** — Stripe integrated, usage limits in place
+
+### What Industry Does It Unintentionally Favor?
+
+**Roofing/Solar/HVAC companies** — The entire Radar config is built around residential service:
+- Home age + income signals
+- Storm event detection
+- Permit tracking
+- Nearby neighborhoods as search units
+
+The photographer config is secondary (feels like an afterthought). The service_professional config is vague. The default is B2B service but under-optimized.
+
+**Why:** The originating use case was automotive (from your Xpose context), then pivoted to roofing/solar. That historical bias is still visible in signal choices and terminology defaults.
+
+### Where the Logic Feels Overfit
+
+1. **Photographer Pipeline:** 8 stages (Inquiry, Booked, Shoot Complete, Editing, Delivered, Paid, Declined, Cancelled) — This is hyper-specific but doesn't generalize to portrait, wedding, or commercial photography. The logic assumes "event-based" photography only.
+
+2. **Residential Service Scoring:** Factors like "home age" and "income tier" only work for roofing/solar/HVAC. They're hardcoded into radar-config but labeled "residential_service" as if it's generic. It's not.
+
+3. **Report Toggles:** Features are flagged off for photographers + service professionals, but it's binary (on/off). There's no "show simplified reports" option. Either you get None or full Monday-style dashboards.
+
+4. **Task Templates:** Default templates are baked into industry-config. Can't edit or customize per org. Every photographer org gets the same task templates.
+
+### What Parts Are Underdeveloped
+
+1. **Reports/Analytics Module:**
+   - Currently gated by permission (members can't access)
+   - No actual report implementations in codebase visible
+   - Likely just stub pages with no real data viz
+
+2. **Communication Logging:**
+   - Only supports manual logging or native call initiatio
+   - No email/SMS integration (no auto-logging from Twilio yet)
+   - No CRM-native email compose (sends reps outside platform)
+   - Can't search/filter communications across org
+
+3. **Contact Management:**
+   - Likely basic CRUD only
+   - No de-duplication logic
+   - No enrichment (no job title inference, etc.)
+   - No bulk import
+
+4. **Automation Actions:**
+   - Only creates tasks
+   - "send_notification" is stubbed (just logged, never actually sent)
+   - No webhook actions
+   - No email/SMS sending
+   - No conditional branching
+
+5. **File Management:**
+   - Recently added (007_files_and_file_links.sql migration)
+   - Likely no virus scanning, no OCR, no document parsing
+
+6. **Intake Forms:**
+   - Recent addition (006_lead_intake_form.sql)
+   - No form builder visible in codebase
+   - Probably template-based only
+
+### What Is Fragile
+
+1. **Industry Config as a Permission Gate:**
+   - Features are toggled off for certain industries (photographers can't see Forecast)
+   - This is enforced in components, not in backend
+   - If a member manually navigates to /reports/forecast, the backend doesn't check industry type
+   - **Risk:** Eager engineers could bypass feature gates
+
+2. **RLS Policies:**
+   - DATABASE_SETUP.md says "allow all" for demo
+   - If this was deployed to production without fixing RLS, entire multi-tenancy is compromised
+   - No evidence in code that RLS was actually locked down
+
+3. **Soft Delete on Communications:**
+   - Communications have deleted_at timestamp
+   - But the component doesn't check for deleted_at when loading timeline
+   - Old deleted communications might still appear
+   - **Risk:** Data leakage
+
+4. **Automation Deduplication:**
+   - 5-minute window to prevent duplicate automation fires
+   - But the dedup query uses automation_logs table
+   - If automation_logs is slow or missing indexes, fires could slip through
+   - For deal_idle_7_days, dedup window is 7 days (weekly check)
+   - Edge case: automation fires twice in < 5min if database is slow
+
+5. **Activity Logger Manual Calls:**
+   - All logging is manual (ActivityLogger.dealCreated(...) etc.)
+   - Easy to forget to call logger when adding new features
+   - No consistency guarantee
+   - **Better approach:** Database triggers or middleware
+
+### What Will Break at Scale
+
+1. **No Pagination:**
+   - Communications timeline likely loads ALL communications for a deal
+   - Deal detail page fetches all tasks + activities
+   - At 100 deals × 1000 communications each = 100k rows loaded per deal view
+   - **Fix:** Implement cursor-based pagination, lazy-load timelines
+
+2. **No Caching:**
+   - Every page load fetches fresh data from Supabase
+   - No query optimization (SELECT *?)
+   - Industry configs are re-fetched on every useIndustry() call (minor)
+   - **Fix:** Add React Query / SWR, implement Supabase caching headers
+
+3. **Automation Deduplication Query:**
+   - Queries automation_logs table for each automation on each trigger
+   - If 100 automations and 1000 deals per day, this is 100k queries
+   - **Fix:** Batch queries, use cache, or move to cron job that processes batches
+
+4. **File Storage:**
+   - Supabase Storage has per-bucket rate limits
+   - No file size validation visible
+   - No cleanup for orphaned files
+   - **Fix:** Add file size limits, implement cleanup workers
+
+5. **MapLibre Rendering:**
+   - Rendering 10k+ points on a map will freeze browser
+   - No point clustering visible in code
+   - **Fix:** Add MapLibre clustering, implement viewport-based loading
+
+6. **Deal/Contact Search:**
+   - Likely full-table scans (no full-text search index)
+   - Supabase doesn't have native FTS without PostgreSQL extension
+   - **Fix:** Add SQL FTS index, or integrate Meilisearch
+
+### Missing Critical Features for Competitive Viability
+
+1. **Deal Probability Weighting:** Deals have probability field in schema but it's never updated. No forecast dashboard that weights by probability. Can't do revenue forecasting.
+
+2. **Team Collaboration:** Only admin can manage team. Members can't @mention each other. No discussion threads on deals. No deal ownership assignment visible.
+
+3. **Email Integration:** No Gmail/Outlook sync. Can't see email history within CRM. No email templates. Manual logging only.
+
+4. **SMS Integration:** No Twilio auto-logging. Auto-log is planned but not implemented.
+
+5. **Calendar Integration:** No calendar sync. Can't see availability. Can't auto-block time when booking made.
+
+6. **Data Import:** No bulk contact import, no CSV loader, no integration with LinkedIn Sales Navigator.
+
+7. **Custom Fields:** Every industry has hardcoded fields. Can't add org-specific fields.
+
+8. **Pipeline Customization:** Stages can be edited but no drag-to-reorder, no custom field mapping per stage.
+
+---
+
+## PHASE 3: STRATEGIC IMPROVEMENTS
+
+### A) PERFORMANCE IMPROVEMENTS
+**Complexity: Medium | Impact: High**
+
+#### 1. Pagination on Activity Timeline
+- **Why:** Deal detail page loads ALL communications, tasks, activities. At scale, this is 1000+ rows.
+- **Implementation:** Cursor-based pagination, load first 20, "load more" button
+- **Technical:** Add created_at index, use offset/limit with created_at cursor
+- **Feasibility:** Low (implement in CommunicationTimeline + API route)
+- **Expected Impact:** 10-50x faster deal detail page loads
+
+#### 2. Full-Text Search on Contacts & Companies
+- **Why:** Currently no way to find contacts except by scrolling list
+- **Implementation:** Add PostgreSQL FTS index on contacts.first_name, last_name, email, companies.name
+- **Technical:** to_tsvector() + to_tsquery() in Postgres
+- **Feasibility:** Medium (SQL migration + API endpoint)
+- **Expected Impact:** Makes contact discovery 100x faster
+
+#### 3. Map Point Clustering
+- **Why:** Rendering 10k points on Prospector map = browser freeze
+- **Implementation:** MapLibre built-in clustering (cluster property in layer)
+- **Technical:** Set cluster: true, clusterRadius: 50 on circle layer
+- **Feasibility:** Low (one-line config change in maplibre component)
+- **Expected Impact:** Prospector usable with 100k+ points
+
+#### 4. React Query Integration
+- **Why:** No request deduplication, no stale-while-revalidate caching
+- **Implementation:** Wrap all fetch calls in useQuery hooks
+- **Technical:** Add @tanstack/react-query, create API hooks
+- **Feasibility:** Medium (refactor all data fetching, one page at a time)
+- **Expected Impact:** 5-10x reduction in duplicate requests, smoother UX
+
+### B) DATA INTELLIGENCE IMPROVEMENTS
+**Complexity: High | Impact: High**
+
+#### 1. Lead Scoring Engine (Not Just Radar Signals)
+- **Why:** You have rich activity data (communications, tasks, deal age) but don't use it to score leads
+- **Implementation:**
+  - Calculate engagement score: # communications + # task completions + recency
+  - Calculate financial score: deal amount × probability
+  - Calculate age score: days since creation (younger = more valuable)
+  - Combine into single "hot lead" score
+- **Technical:** Create SQL view or cron job that updates deals.score nightly
+- **Feasibility:** Medium (SQL + API endpoint)
+- **Expected Impact:** Reps focus on hottest leads → higher conversion
+
+#### 2. Pipeline Velocity Analytics
+- **Why:** Helps forecast close dates and identify bottlenecks
+- **Implementation:**
+  - Track time spent in each stage (avg time from entry to exit)
+  - Show histogram of days-in-stage per history
+  - Alert if deal is overdue in a stage
+- **Technical:** Calculate stage entry/exit from activity logs, aggregate
+- **Feasibility:** Medium (complex SQL query)
+- **Expected Impact:** Identify stalled deals, predict close dates
+
+#### 3. Propensity-to-Close Model (Basic)
+- **Why:** Which deals are most likely to close in next 30 days?
+- **Implementation:**
+  - Simple heuristic: deals in "Proposal" or "Negotiation" + recent activity + short close date
+  - Machine learning later: train model on historical deal outcomes
+- **Technical:** SQL query with weighted scoring
+- **Feasibility:** Low → Medium (heuristic now, ML later)
+- **Expected Impact:** Prioritization clarity, focus sales effort
+
+#### 4. Contact Enrichment
+- **Why:** Contacts have no company_id, no title inference, no social links
+- **Implementation:**
+  - Add company_id to contacts, create company-contact relationship
+  - Add title, department fields
+  - Allow manual entry for now, add integration later
+- **Technical:** Schema migration, UI forms
+- **Feasibility:** Medium (new fields + forms)
+- **Expected Impact:** Better targeting, firmographic filtering
+
+### C) INDUSTRY EXPANSION ENHANCEMENTS
+**Complexity: Medium | Impact: Medium**
+
+#### 1. Decouple CRM Industry Types from Radar Industry Types
+- **Why:** Currently misaligned. Photographer in CRM maps to photographer in Radar, but service_professional doesn't have a radar counterpart.
+- **Implementation:**
+  - Add radar_industry_type field to orgs table
+  - Create explicit mapping table: org_industry_config
+  - Let orgs choose CRM type + Radar type independently
+- **Technical:** Schema migration, update getRadarConfig()
+- **Feasibility:** Medium (refactor config layer)
+- **Expected Impact:** Photographers can use roofing-style prospecting, B2B can use residential signals
+
+#### 2. Make Industry Configurations Data-Driven
+- **Why:** Hardcoded configs force code changes to add industries
+- **Implementation:**
+  - Move INDUSTRY_CONFIGS to database table: industry_templates
+  - Create admin UI to edit pipeline stages, terminology, features per industry
+  - Orgs can clone default templates or create custom
+- **Technical:** New table, migration, admin pages
+- **Feasibility:** High (refactor + new UI)
+- **Expected Impact:** Can add custom verticals without deployment
+
+#### 3. Hyper-Specific Templates for New Verticals
+- **Why:** Photographer is 8 stages because of event-based workflow. Portrait photographers only need 3 (Inquiry, Shoot, Delivered). Studio photographers need 6 (Inquiry, Pre-prod, Shoot, Editing, Delivery, Follow-up).
+- **Implementation:**
+  - Create sub-templates within photographer: event, portrait, studio, real-estate, commercial
+  - Each has custom stages, signals, fields
+- **Technical:** Extended industry-config structure
+- **Feasibility:** Medium (config + components update)
+- **Expected Impact:** Better UX fit for niche photographers
+
+#### 4. Barbershop, Tattoo, Nail Salon Templates
+- **Why:** You mentioned these as expansion targets. Service-based but with repeat customers (unlike solar/roofing one-time sales)
+- **Implementation:**
+  - Create "recurring service" template: Service Requested → Booked → Completed → Repeat Customer
+  - Track customer lifetime value, repeat frequency
+  - Task templates for follow-up bookings (6 weeks post-service, etc.)
+- **Technical:** New industry type, RLS policies for repeat customers
+- **Feasibility:** Medium (new config + logic)
+- **Expected Impact:** Unlock subscription-business verticals (higher LTV)
+
+### D) UI/UX STRUCTURAL IMPROVEMENTS (Not Cosmetic)
+**Complexity: Medium | Impact: Medium**
+
+#### 1. Deal Sidebar Context Panel
+- **Why:** Deal detail page is long. Reps need quick reference while editing notes/tasks.
+- **Implementation:**
+  - Sticky right sidebar: deal summary (amount, stage, close date, contact, files)
+  - Left main content: full timeline + activities
+  - Mobile: collapsible sidebar
+- **Technical:** Refactor deal detail layout, CSS grid/flex
+- **Feasibility:** Low (layout only)
+- **Expected Impact:** Faster rep workflows, less scrolling
+
+#### 2. Unified Search Across All Entities
+- **Why:** Currently have deal search, contact search, company search scattered
+- **Implementation:**
+  - Global search bar (top of dashboard)
+  - Search across deals, contacts, companies, communications
+  - Return results grouped by type
+  - Fuzzy matching
+- **Technical:** Search API endpoint, Meilisearch or PostgreSQL FTS
+- **Feasibility:** Medium (search engine integration)
+- **Expected Impact:** Faster navigation, discoverability
+
+#### 3. Quick-Add Popover (Keyboard Shortcut)
+- **Why:** Creating new deal requires navigation to /deals/new. Should be instant.
+- **Implementation:**
+  - Cmd+K or Ctrl+K opens quick-add modal
+  - Select type: deal, contact, task
+  - Fill minimal fields, hit enter
+  - Redirects to detail page
+- **Technical:** Keyboard listener, modal component
+- **Feasibility:** Low (new component, keyboard handler)
+- **Expected Impact:** 2-3x faster deal creation workflow
+
+#### 4. Customizable Dashboard Widgets
+- **Why:** Dashboard currently shows generic activity feed. Not personalized to rep role.
+- **Implementation:**
+  - Let reps drag-and-drop widgets
+  - Widget types: "My hot leads", "Tasks due today", "Week forecast", "Conversion funnel"
+  - Save layout per user
+- **Technical:** Widget system, localStorage for layout
+- **Feasibility:** Medium (component framework)
+- **Expected Impact:** Reps focus on what matters to them first
+
+### E) FEATURE ADDITIONS THAT INCREASE RETENTION
+**Complexity: Medium | Impact: High**
+
+#### 1. Communication Logging Is The Core Lock-In
+- **Why:** Once a rep logs 100+ communications to Cadence, switching costs are enormous (data loss)
+- **Implementation:** (You already planned this!)
+  - Implement call + email logging (you have the spec)
+  - Add SMS auto-logging from Twilio
+  - Make communications searchable and filterable
+  - Show communication timeline on every deal/contact
+- **Technical:** Implement the spec you just created
+- **Feasibility:** Low-Medium (straightforward build from spec)
+- **Expected Impact:** **HIGHEST ROI FEATURE.** Communication data becomes your moat.
+
+#### 2. Automation Playbooks (Simple Workflows)
+- **Why:** Automations are powerful but hidden behind admin gates. Reps should see "If deal moves to Proposal, auto-create Follow Up task" at time of move.
+- **Implementation:**
+  - Show relevant automations on each deal
+  - Let reps trigger automations manually (even if feature-gated)
+  - Show execution history (last 5 runs)
+- **Technical:** Add automation sidebar to deal detail
+- **Feasibility:** Low (UI only)
+- **Expected Impact:** Reps trust automation, builds dependency
+
+#### 3. Weekly Email Digest
+- **Why:** Keeps reps engaged, surfaces opportunities they missed
+- **Implementation:**
+  - Sunday evening: email digest with
+    - Deals overdue in stage
+    - Tasks due this week
+    - Leads scored as "hot"
+    - Team member activity (who closed what)
+  - Unsubscribe link
+- **Technical:** Cron job + email service (Resend, SendGrid)
+- **Feasibility:** Medium (email design + delivery)
+- **Expected Impact:** 20-30% increase in daily active users
+
+#### 4. Repeating Tasks
+- **Why:** "Follow up every 7 days" is a common manual task creation pattern
+- **Implementation:**
+  - Add recurs field to tasks: "daily", "weekly", "monthly", "custom"
+  - Auto-create next task when current is marked done
+  - Let users configure max repeat count
+- **Technical:** Task creation logic + automation
+- **Feasibility:** Low (straightforward logic)
+- **Expected Impact:** Reduces task creation overhead, ensures follow-ups happen
+
+#### 5. Deal Collaboration & Comments
+- **Why:** Currently no way for reps to discuss deal without leaving CRM
+- **Implementation:**
+  - Comments section on deal detail
+  - @mention teammates
+  - Notifications when mentioned
+  - Comment threads (grouped by topic)
+- **Technical:** New comments table, real-time updates with Supabase realtme
+- **Feasibility:** Medium (DB + component)
+- **Expected Impact:** Keeps reps in platform, higher engagement
+
+### F) FEATURE ADDITIONS THAT INCREASE MONETIZATION
+**Complexity: Medium | Impact: High**
+
+#### 1. Usage-Based Pricing Tier (Currently Unused)
+- **Why:** You have usage_limits table but no enforcement. Can't charge variable rates.
+- **Implementation:**
+  - Tier 1 ($29): 50 contacts, 10 deals, no automation, 1 user
+  - Tier 2 ($79): 500 contacts, 100 deals, automations, 3 users
+  - Tier 3 ($199): Unlimited, API access, integrations, 10 users
+  - Pro Tier ($499): Custom integrations, dedicated support
+- **Technical:** Enforce limits in API routes, show usage in dashboard
+- **Feasibility:** Medium (add enforcement, update Stripe product)
+- **Expected Impact:** 3-5x average revenue per account
+
+#### 2. White-Label for Agencies
+- **Why:** Agencies (marketing, real estate) could resell Cadence to clients
+- **Implementation:**
+  - Custom branding: logo, colors, domain
+  - White-label login page (client.yournamae.com instead of app.cadence.com)
+  - Agency admin dashboard to manage sub-orgs
+  - Revenue share: 70% to agency
+- **Technical:** Multi-level multi-tenancy, domain routing
+- **Feasibility:** High (complex multi-tenancy)
+- **Expected Impact:** New revenue channel, lower churn (agencies sticky)
+
+#### 3. Marketplace for Integrations
+- **Why:** You can't build every integration, but partners can
+- **Implementation:**
+  - Define integration SDK (Zapier-style)
+  - Allow partners to build: Email sync (Gmail/Outlook), Calendar (Google/Outlook), SMS (Twilio), Slack
+  - Marketplace page to discover integrations
+  - Revenue share: 20% of integration fees
+- **Technical:** API framework, integration registry
+- **Feasibility:** High (complex, requires API stability)
+- **Expected Impact:** 2-3x feature coverage, partner revenue
+
+#### 4. Advanced Analytics Addon
+- **Why:** Currently no reports. Reports are lucrative (Salesforce premium feature)
+- **Implementation:**
+  - Advanced package: $49/user/month
+  - Includes: Sales velocity, win/loss analysis, forecast, funnel, rep leaderboard
+  - Custom date ranges, export to PDF
+- **Technical:** Build report components (you have the schema)
+- **Feasibility:** Medium (data viz + authorization)
+- **Expected Impact:** 2x ARPU from sales teams
+
+#### 5. Prospector Premium Mode
+- **Why:** Currently limited to 200 results, basic scoring. Pros want more.
+- **Implementation:**
+  - Free: 50 results, basic scoring, 1 map
+  - Pro: 500 results, advanced scoring, 5 maps, saved searches
+  - Enterprise: Unlimited, custom signals, API access
+- **Technical:** Add usage limits, gating in prospector component
+- **Feasibility:** Low (config + gating)
+- **Expected Impact:** 1.5-2x ARPU from roofing/solar segment
+
+### G) AUTOMATION OPPORTUNITIES
+**Complexity: Medium | Impact: Medium**
+
+#### 1. Idle Deal Detection (Server-Side Cron)
+- **Why:** You have onDealIdle7Days function but it's not wired to cron
+- **Implementation:**
+  - Add cron route: /api/cron/automation-idle-deals
+  - Call from external cron service (Vercel Cron, EasyCron, AWS Lambda)
+  - Run daily at 2 AM
+  - Finds deals with no activity in 7 days, fires idle automation
+- **Technical:** API route + cron service integration
+- **Feasibility:** Medium (cron setup)
+- **Expected Impact:** Auto-surface stalled deals, higher conversion
+
+#### 2. Deal Lost Revisit Tasks
+- **Why:** onDealLost should auto-create 60-day follow-up task
+- **Implementation:**
+  - Wire up onDealLost trigger
+  - Auto-create "Revisit lost deal" task (60-day due date)
+  - Let automation engine handle it
+- **Technical:** Update deal stage change handler
+- **Feasibility:** Low (logic already exists)
+- **Expected Impact:** Recover lost deals (10-20% revisit rate)
+
+#### 3. Task Overdue Alerts
+- **Why:** Automation engine has task_overdue trigger but it's not implemented
+- **Implementation:**
+  - Send notification when task is 1 day overdue
+  - Send daily digest of all overdue tasks
+  - Escalate to manager if rep's tasks overdue 3+ days
+- **Technical:** Implement task_overdue automation
+- **Feasibility:** Low (straightforward)
+- **Expected Impact:** Better task completion rate
+
+#### 4. Automatic Follow-Up Scheduling
+- **Why:** Reps should never manually schedule "call back on X date"
+- **Implementation:**
+  - Add "auto follow-up" checkbox on communications
+  - Creates task automatically 3/7/14 days later
+  - Template: "Follow up on [original communication type]"
+- **Technical:** Communication save handler + task automation
+- **Feasibility:** Low (logic exists)
+- **Expected Impact:** Never miss follow-ups
+
+### H) COMPETITIVE DIFFERENTIATION
+**Complexity: High | Impact: High**
+
+#### 1. Industry-Specific Playbooks
+- **Why:** Salesforce has "Sales Cloud", but it's generic. You could be specific.
+- **Implementation:**
+  - Roofing: "Storm response playbook" (detect storm, auto-create 10 tasks for rapid follow-up)
+  - Solar: "Lead qualification playbook" (auto-score on roof condition, credit, location)
+  - Photography: "Event booking playbook" (deposit collection, pre-shoot questionnaire, post-shoot upsell)
+  - Barbershop: "Retention playbook" (auto-task for 6-week follow-up, member rewards tracking)
+- **Technical:** Pre-built automation chains, onboarding wizard
+- **Feasibility:** High (many automations per playbook)
+- **Expected Impact:** 30% faster onboarding, higher activation
+
+#### 2. Vertical-Specific Prospecting Signals
+- **Why:** Radar has generic "low rating" + "no website". That's not differentiated.
+- **Implementation:**
+  - Roofing: "Roof age", "storm risk", "past claims", "contractor license status"
+  - Solar: "Sun exposure", "electricity rates", "utility incentives", "credit score"
+  - Photography: "Event frequency", "social media presence", "competitor photos", "photography style affinity"
+  - Barbershop: "Population density", "foot traffic", "foot traffic seasonality"
+- **Technical:** Add data source integrations, custom scoring algorithms
+- **Feasibility:** High (data partnerships needed)
+- **Expected Impact:** 2-3x lead quality vs generic prospecting
+
+#### 3. AI-Powered Deal Recommendations
+- **Why:** "Next deal to work on?" should be smart, not chronological
+- **Implementation:**
+  - ML model trained on historical deal outcomes
+  - Recommends: "Work on Deal X next, 75% probability" based on:
+    - Deal age + activity + stage
+    - Rep history (what this rep closes best)
+    - Seasonal factors
+  - A/B test: reps who follow recommendations vs don't
+- **Technical:** Model training (weeky), API to rank deals
+- **Feasibility:** High (requires ML infrastructure)
+- **Expected Impact:** 5-10% improvement in win rate
+
+#### 4. Communication-First CRM (Not Data-First)
+- **Why:** Monday/Salesforce ask "what deal?", then show communications. You should invert: start with communications, infer deals.
+- **Implementation:**
+  - Reps log call/email first
+  - System suggests: "Link to Deal X, Contact Y" with one click
+  - Auto-timeline everything, auto-create deal if needed
+  - Less friction than traditional CRM workflows
+- **Technical:** Communication-centric UI, auto-linking logic
+- **Feasibility:** Medium (UX refactor)
+- **Expected Impact:** 50% faster rep adoption, higher data quality
+
+#### 5. Industry-Specific Reporting
+- **Why:** Roofing cares about "jobs per storm event", not "conversion funnel"
+- **Implementation:**
+  - Roofing: "Storm response velocity", "jobs closed per month", "avg job value"
+  - Photography: "Bookings per inquiries", "avg event value", "repeat client rate"
+  - Barbershop: "Customer lifetime value", "visit frequency", "churn rate"
+  - Each with pre-built dashboards, no customization needed
+- **Technical:** Industry-specific SQL queries, pre-built dashboards
+- **Feasibility:** Medium (define metrics per vertical)
+- **Expected Impact:** Reps see metrics that matter, higher engagement
+
+---
+
+## PHASE 4: LOCK-IN STRATEGY
+
+### The Communication Logging Moat
+
+**The Single Most Important Decision You Can Make:**
+
+Once a rep has logged 500+ calls, 200+ emails, 1000+ notes into Cadence, switching CRMs costs:
+- **12-24 months of re-logging** (or data loss)
+- **Team retraining** on new system
+- **Broken workflows** (automations, templates)
+- **Integration downtime** (email, calendar, Slack if added)
+
+This is **higher switching cost than Salesforce** because you're younger and simpler (easier to leave) — BUT communications make you sticky.
+
+**Action Items:**
+1. **Implement communication logging** (your spec is perfect) — HIGHEST PRIORITY
+2. **Add Twilio SMS auto-logging** (planned enhancement)
+3. **Add Gmail/Outlook email auto-logging** (future, uses Gmail API)
+4. **Make communications beautiful** — timeline view, search, filtering should be best-in-class
+5. **Integrate communications everywhere** — deal detail, contact detail, dashboard, reports
+6. **Market this heavily** — "Complete communication history, never lose context"
+
+**Why This Wins:**
+- Salesforce's communication features are buried, expensive ($165/user for einstein AI)
+- HubSpot charges separately for email sequencing
+- You can include it free in base tier and it becomes table-stakes
+- Network effect: teams that don't use it churn, teams that do stay 2+ years
+
+---
+
+### Unique Data Advantage: Radar Intent Signals
+
+**Opportunity:** You have geospatial + behavioral data that SaaS CRMs don't:
+- Which roofing companies are located near recent storms
+- Which solar prospects have high sun exposure + rising electricity rates
+- Which photographers are in high-density event areas
+
+**Competitive Moat:**
+- Competitors can build a CRM feature-parity with you
+- Competitors cannot easily replicate storm data + scoring without partnerships
+- This data is **exclusive** if you own the source integrations
+
+**Action Items:**
+1. **Formalize data partnerships** (NOAA for storms, NREL for solar exposure, etc.)
+2. **Create proprietary scoring algorithms** per vertical
+3. **Patent the scoring method** if defensible
+4. **Offer API access to this data** as premium feature ($299/month)
+5. **Partner with contractors** (roofing companies can supply leads from radar data, you take cut)
+
+**Why This Wins:**
+- Monday/Salesforce can't replicate this without re-building prospecting module
+- Your data advantage compounds over time (more leads logged = better scoring)
+
+---
+
+### Network Effect: Industry Specific Communities
+
+**Opportunity:** Once you have 100+ roofing companies in Cadence, create:
+- **Roofing benchmark reports** ("your team closes 18% of leads, industry avg is 12%")
+- **Lead sharing marketplace** (one company's unqualified lead is another's fit)
+- **Playbook sharing** ("Storm response playbook v2.1 by TopRoofer Inc.")
+- **Slack community** for roofing pros to share tactics
+
+**Why This Locks Users In:**
+- Leaving Cadence = losing access to benchmark data + playbooks
+- Data network effects: the more roofing companies use it, the more valuable it gets
+
+**Action Items:**
+1. **Build roofing community first** (you have the most signal here)
+2. **Monthly benchmarking report** (email to all roofing orgs)
+3. **Private Slack community** with playbook library
+4. **Leaderboard** (top 10 roofing companies by close rate, anonymized)
+
+---
+
+### Retention Loops: Habit Formation
+
+**Problem:** You have feature-based retention (automations, communications). But users need **habit loops**.
+
+**Habit Loop = Cue → Routine → Reward**
+
+**Current Cues:**
+- Opening dashboard (routine: check activity feed)
+- Deal gets stuck (routine: create task)
+
+**Missing Cues:**
+- Sunday evening email: "Your hot leads for this week" (cue)
+- Daily Slack notification: "3 tasks due today" (cue)
+- Weekly text: "You've closed 3 deals this month" (cue)
+
+**Action Items:**
+1. **Sunday Email Digest** (hot leads + team activity)
+2. **Morning Slack Integration** (tasks due today in Slack)
+3. **Weekly Win Celebration** (text: "You closed X deals! 🎉")
+4. **Leaderboard Gamification** (team members can see who's winning)
+
+**Why This Matters:**
+- Habit-forming products have 30-40% higher retention
+- Cues create "muscle memory" to check Cadence daily
+
+---
+
+### Price Lock-In: Switching Costs via Contract Terms
+
+**Unlike SaaS with annual contracts, you're monthly.** To create lock-in:
+
+1. **Annual prepay discount** (20% off if paid yearly)
+   - Creates switching cost (recover discount if leave)
+2. **Volume discounts** (5 users @ $79/user normally = $395; annual commit = $3,400 = 14% savings)
+3. **Data export fee** (charge $500 to export communication history in bulk)
+   - Makes leaving tangibly expensive
+   - Recoup lost revenue from churn
+
+**Why This Works:**
+- Annual contracts are standard in enterprise (why Salesforce is sticky)
+- You can't require annual yet, but volume discounts create soft lock-in
+
+---
+
+## PHASE 5: RUTHLESS HONESTY
+
+### What Is Poorly Structured
+
+1. **Industry Config Hardcoding Is a Bottleneck**
+   - You can't add a new vertical without deploying code
+   - Clients can't customize their own terminology
+   - This will 100% hold you back at scale
+   - **Fix:** Move to database-driven config (medium effort, high return)
+
+2. **Automation Conditions Are Brittle**
+   - Hardcoded conditions in code (stage_is, value_greater_than)
+   - Can't extend without code change
+   - No UI for users to define conditions
+   - **Fix:** Build a condition builder (Zapier-style drag-and-drop)
+
+3. **Activity Logging Is Manual Everywhere**
+   - Developers must remember to call ActivityLogger.dealCreated() every time
+   - Easy to miss. Bad for audit trail consistency.
+   - **Fix:** Database triggers on insert/update, or middleware that auto-logs
+
+4. **RLS Policies Are Likely Not Enforced**
+   - DATABASE_SETUP.md admits "allow all" for demo
+   - No evidence in codebase that this was locked down for production
+   - If live now, entire multi-tenancy is at risk
+   - **Fix:** Audit RLS policies immediately, add tests
+
+5. **State Management Will Break at 30+ Pages**
+   - React Context + useState is fine for 15 pages
+   - At 50+ pages (reports, automations, integrations, API, etc.), you'll need Zustand or Redux
+   - No query cache, no normalized state, no batching
+   - **Fix:** Add React Query now, before it's too late
+
+### What Is Overengineered
+
+1. **Radar Config Is Way More Complex Than Needed**
+   - 9 industry types, 8+ signals per type, custom scoring per type
+   - But this complexity is totally hidden from users
+   - UI doesn't expose 99% of it (just shows map)
+   - **Better approach:** Simpler config, let users configure signals in UI
+
+2. **Communications Schema Has Too Many Fields**
+   - Has fields for SMS, email, call, note all in one table
+   - Type-discriminated (communication_type)
+   - But SMS and email have almost no overlap
+   - **Better approach:** Separate tables with shared base table, or use JSONB
+
+3. **Automation Metadata Storage**
+   - Every automation stores trigger_config, conditions, actions as JSONB
+   - Makes it hard to query (can't do SELECT * FROM automations WHERE trigger_config->>'is_won' = true)
+   - **Better approach:** Separate tables for trigger_configs, conditions, actions
+
+### What Is Missing That Prevents Scale
+
+1. **No Request Tracing / Monitoring**
+   - No correlation IDs on API requests
+   - No way to trace a bug from user report to actual code
+   - No performance instrumentation
+   - **Fix:** Add OpenTelemetry or Posthog event tracking
+
+2. **No Rate Limiting**
+   - API routes have no rate limits
+   - Bad actor could DOS your Supabase instance
+   - **Fix:** Add Vercel rate limiting or middleware.ts
+
+3. **No Database Query Optimization**
+   - Likely doing SELECT * on every table fetch
+   - No indices on commonly queried columns
+   - **Fix:** Audit slow queries, add indices strategically
+
+4. **No Data Retention Policy**
+   - Activities, automation_logs, analytics_cache grow forever
+   - At 1 year, you'll have 50GB+ of logs you don't use
+   - **Fix:** Implement 90-day archive of old activity logs
+
+5. **No Disaster Recovery Plan**
+   - No backups, no failover strategy
+   - Supabase has backups (good), but you can't restore specific tables/rows
+   - **Fix:** Document RTO/RPO targets, test recovery
+
+### Product Positioning Issues
+
+1. **You're Trying to be "CRM for Everyone" When You Should Own a Vertical**
+   - Monday/Salesforce are better at generic CRM
+   - You're better at roofing/solar
+   - Trying to be "also for photographers, also for service pros, also for B2B" = diluted
+   - **Better positioning:** "The roofing CRM. Built by roofers, for roofers."
+   - Then expand vertically one at a time
+
+2. **You're Not a Prospecting Tool, but You Act Like One**
+   - The Prospector lead mapper is cool, but it's not what sells CRMs
+   - What sells: deal tracking, automation, reporting
+   - The map is a feature, not the product
+   - **Better positioning:** "Sales automation for home services businesses"
+
+3. **Your Free Tier is Too Generous**
+   - You're allowing unlimited contacts + deals (I assume, based on code)
+   - This attracts non-buyers
+   - **Better positioning:** Free for 5 contacts + 1 deal, then paywall at $29/mo
+
+### Competition Issues
+
+1. **HubSpot Free Plan is Better Than Your Paid Plan**
+   - HubSpot free: 1 user, unlimited contacts, deals, basic automation
+   - You're charging $79/mo to compete
+   - You'll never win a direct shootout
+   - **Better strategy:** Don't compete on features. Own roofing instead (HubSpot doesn't).
+
+2. **Salesforce Has Better Integrations**
+   - Email, calendar, Slack, Jira, etc.
+   - You have none
+   - **Better strategy:** Pick 2-3 integrations that roofing companies actually use (scheduling, invoicing) and own those
+
+3. **Monday Has Better UI/UX**
+   - More polished, more animations, more "wow"
+   - You're functional, not beautiful
+   - **Better strategy:** Invest in design later (after you have product-market fit). Now: focus on roofing-specific features.
+
+---
+
+## SUMMARY & PRIORITIZED ROADMAP
+
+### Highest Priority (Next 30 Days)
+1. **Implement Communication Logging** (your spec) — This is your moat
+2. **Fix RLS Policies** — Security/multi-tenancy audit
+3. **Add Pagination** — Deal detail pages
+4. **Implement Cron for Idle Deals** — Automation engine completion
+
+### Medium Priority (60 Days)
+1. **Data-Driven Industry Config** — Move from hardcoded to database
+2. **Lead Scoring Engine** — Engagement + financial scores
+3. **React Query Integration** — Data caching + deduplication
+4. **Twilio SMS Auto-Logging** — Automation completion
+
+### Future Priority (90+ Days)
+1. **Advanced Reports** — Premium feature ($49/user)
+2. **Playbook System** — Industry-specific automation chains
+3. **Prospector Premium** — Usage-based pricing
+4. **Community Features** — Benchmarking, leaderboards, playbook library
+5. **API Program** — White-label + integrations marketplace
+
+### What to Ignore (Don't Build)
+- Competing on generic CRM features (HubSpot/Salesforce already won)
+- Building features for "all industries" (focus on roofing + solar first)
+- Custom fields UI (too complex, too late)
+- Advanced AI (too expensive, too risky)
+
+---
+
+## FINAL VERDICT
+
+**Cadence is well-architected but under-positioned.**
+
+You have solid foundations:
+- ✅ Multi-tenancy works
+- ✅ Automation engine is flexible
+- ✅ Industry abstraction is clever
+- ✅ Communication logging is well-designed
+
+But you're scattered:
+- ❌ Trying to serve too many industries with equal effort
+- ❌ Not leveraging your unique advantage (geospatial data for roofing/solar)
+- ❌ Not building habit loops or lock-in features
+- ❌ Competing directly with better-funded competitors
+
+**The Path Forward:**
+
+Own roofing/solar with a vengance. Build roofing-specific playbooks, prospecting signals, benchmark reports, community. Become "The roofing CRM." Then expand to 2-3 adjacent verticals (solar, HVAC, plumbing).
+
+Focus on communication logging + automation as your retention loops. Make switching cost so high that roofing companies stay for 3+ years.
+
+Do this, and you have a $50M+ SaaS company. Try to be "CRM for everyone," and you'll die competing with Salesforce.
+
+---
+
+**Report End. Questions? Ask before building.**
+A) Performance Improvements
+
+Regular terms
+
+Add pagination for deal timelines (activities/comms/tasks) so you don’t load thousands of rows at once.
+
+Add full-text search in Postgres for contacts/companies so users can find stuff instantly.
+
+Ensure Map point clustering is enabled so the prospector map doesn’t freeze with lots of points.
+
+Add React Query/SWR to cache + dedupe requests so pages feel fast and you don’t spam Supabase.
+
+Layman terms
+
+Don’t load everything on a page — load a little and let users click “load more.”
+
+Add a search bar that actually finds names/emails fast.
+
+When there are tons of dots on the map, group them so the browser doesn’t crash.
+
+Stop re-downloading the same data over and over.
+
+B) Data Intelligence Improvements
+
+Regular terms
+
+Build an internal deal “hotness” score using engagement + recency + value × probability so reps know what to work next.
+
+Add pipeline velocity analytics (time-in-stage tracking) to spot bottlenecks and predict close dates.
+
+Add a basic propensity-to-close heuristic (no ML yet) to prioritize likely wins in the next 30 days.
+
+Improve contact data model: company↔contact relationships, titles/departments, better segmentation (manual first).
+
+Layman terms
+
+Show “these are the hottest deals right now” instead of making people guess.
+
+Show where deals get stuck and how long it usually takes to close.
+
+Tell reps “this one is likely to close soon” based on simple signals.
+
+Let contacts actually be organized under companies with useful details.
+
+C) Industry Expansion Enhancements
+
+Regular terms
+
+Decouple CRM industry type from Radar industry type so orgs can mix workflows + prospecting styles.
+
+Move industry configs from hardcoded files to database-driven templates with an admin editor.
+
+Add sub-templates for photographers (event/portrait/studio/real-estate) so it’s not overfit.
+
+Add templates for repeat-customer businesses (barbershop/tattoo/nails) with retention loops.
+
+Layman terms
+
+Let users choose “how my CRM works” separately from “how my map/prospector works.”
+
+Stop requiring code changes every time you add a new industry.
+
+Make photographer mode actually fit different kinds of photographers.
+
+Add simple setups for businesses that rely on repeat customers.
+
+D) UI/UX Structural Improvements (not cosmetic)
+
+Regular terms
+
+Add a deal sidebar summary so reps don’t scroll forever (sticky context panel).
+
+Build a unified global search across deals/contacts/companies/comms.
+
+Add quick-add (Ctrl/Cmd+K) for creating deals/contacts/tasks fast.
+
+Allow dashboard widgets that users can rearrange (personalized home view).
+
+Layman terms
+
+Keep key deal info visible while you scroll.
+
+One search box to find anything.
+
+A quick shortcut to add stuff instantly.
+
+Let users customize their dashboard to what they care about.
+
+E) Features That Increase Retention
+
+Regular terms
+
+Make communication logging the core: searchable, filterable timelines everywhere (deal/contact/dashboard).
+
+Surface automation playbooks in-context so users see what runs and trust it.
+
+Add weekly email digests (hot leads, overdue tasks, stalled deals).
+
+Add repeating tasks (follow-up every 7 days) and auto-create next.
+
+Add deal comments/@mentions with notifications for collaboration.
+
+Layman terms
+
+Get users to log calls/texts/emails in Cadence so leaving would hurt.
+
+Make automations obvious and useful, not hidden.
+
+Send a weekly “here’s what you need to do” summary.
+
+Stop people from re-creating the same follow-up tasks manually.
+
+Let teams talk about a deal inside the deal.
+
+F) Features That Increase Monetization
+
+Regular terms
+
+Enforce usage limits and tie them to real tiers (contacts, deals, users, automations).
+
+Offer white-label for agencies (branding + sub-org management).
+
+Build an integrations marketplace only after API stabilizes (Zapier-like).
+
+Sell advanced analytics as a paid add-on.
+
+Add Prospector premium (more results, saved searches, advanced scoring).
+
+Layman terms
+
+Charge fairly based on how much they use it.
+
+Let agencies resell it with their logo for more revenue.
+
+Eventually let others build integrations so you don’t have to build everything.
+
+Sell better reporting as a paid upgrade.
+
+Make the map/prospector a paid power feature.
+
+G) Automation Opportunities
+
+Regular terms
+
+Wire idle-deal detection to an actual cron job (daily scheduled run).
+
+Auto-create revisit tasks for lost deals (ex: 60 days later).
+
+Implement task overdue alerts + escalation rules.
+
+Add auto-follow-up scheduling when logging communications.
+
+Layman terms
+
+Automatically remind you when deals go cold.
+
+Remind you to revisit deals you lost later.
+
+Nudge people when tasks are overdue.
+
+After a call/email, automatically schedule the next follow-up.
+
+H) Competitive Differentiation
+
+Regular terms
+
+Build industry-specific playbooks (prebuilt workflows + automations) for roofing/solar/HVAC/etc.
+
+Improve vertical-specific prospecting signals over generic “low rating/no website.”
+
+Add AI deal recommendations later; start with heuristics now.
+
+Become communication-first: log comms first, link/suggest deals automatically.
+
+Build industry-specific reporting (roofing metrics ≠ generic funnel).
+
+Layman terms
+
+Don’t be “CRM for everyone.” Be “the best CRM for home services.”
+
+Make the map/lead intelligence actually unique per industry.
+
+Eventually recommend what to work on next, but start simple.
+
+Make comms the center of the product so reps live in Cadence.
+
+Show metrics that actually matter to roofers/HVAC/etc., not generic dashboards.
+
+If you want, I can also condense this into a 1-page “execution plan” (30/60/90 days) in the same two-language style.
+
+okay so aside from the summary, the actual doc i sent by haiku, what are the most important takeaways - from each point it made
+
+Here are the most important takeaways from each major point Haiku made — distilled to what actually matters (what will make/break Cadence).
+
+Phase 1: Codebase understanding
+
+Stack is solid and modern (Next 14 + TS + Supabase + Tailwind + MapLibre + Stripe).
+Takeaway: You can ship fast; you don’t need a rewrite.
+
+Your data model is “correct” but not optimized.
+Takeaway: It’ll work now, but you’ll need pagination/indexing/caching before you grow.
+
+Industry system is clever but hardcoded and mismatched (CRM vs Radar).
+Takeaway: This will block you later unless you decouple/make it data-driven.
+
+Automation engine is real, but too limited to be “automation.”
+Takeaway: It’s currently “auto-create tasks,” not a real workflow engine yet.
+
+Activity + communications logging is your strongest module.
+Takeaway: This is your best-built “sticky” system—lean into it.
+
+Phase 2: Product evaluation
+
+You’re optimized for small home-service teams (1–5 reps).
+Takeaway: That’s your natural wedge. Don’t dilute it.
+
+The platform unintentionally favors roofing/solar/HVAC.
+Takeaway: Your Radar signals + terminology are built around residential services, not general CRM.
+
+You are overfit in a few places (photography pipeline, “residential_service” scoring).
+Takeaway: Some “industry modes” aren’t truly generic; they’re assumptions that will confuse other users.
+
+Big parts are underdeveloped: reports, communications automation, contact import/dedupe, automation actions, intake form builder.
+Takeaway: You have the skeleton of a CRM, but not enough “daily driver” convenience yet.
+
+Fragility risks are real:
+
+Industry gating is UI-only
+
+RLS is loose (“allow all”)
+
+Soft deletes may still show
+
+Manual activity logging is easy to forget
+Takeaway: Security + consistency are the main technical risks.
+
+Scale breakers:
+
+No pagination
+
+No caching
+
+Automation dedup queries could explode
+
+Map performance will die at high points
+
+Search is weak
+Takeaway: Performance fixes are mandatory before growth.
+
+Missing “competitive viability” features:
+
+Email/SMS integration
+
+Calendar sync
+
+Imports
+
+Custom fields
+
+Real reporting
+Takeaway: You don’t need Salesforce parity, but you do need a few “table stakes” to keep teams.
+
+Phase 3: Strategic improvements (the “so what” section)
+
+Performance: Pagination + clustering + React Query + FTS are high ROI.
+Takeaway: These are cheap wins that prevent future pain.
+
+Data intelligence: Use your own CRM activity to score and prioritize deals.
+Takeaway: “What to do next” is more valuable than “more features.”
+
+Industry expansion: Decouple Radar/CRM types and move configs to templates.
+Takeaway: If you want multi-vertical, you need a template system or you’ll be stuck shipping code for every new vertical.
+
+UI/UX structure: Add sidebar context, global search, quick add.
+Takeaway: These are workflow accelerators (retention drivers), not “pretty UI.”
+
+Retention: Communication logging is the moat.
+Takeaway: Make comms searchable + everywhere + eventually auto-logged.
+
+Monetization: Usage limits exist but aren’t enforced; Prospector can be tiered.
+Takeaway: Your pricing lever is already in your schema—activate it.
+
+Automation opportunities: Cron-based “idle deals” and overdue alerts are easy wins.
+Takeaway: Automations should save users daily, not be a “settings page.”
+
+Differentiation: Win via vertical playbooks + vertical signals, not generic CRM parity.
+Takeaway: Your unfair advantage is “home services + geo signals + playbooks.”
+
+Phase 4: Lock-in strategy
+
+Communication history creates switching costs bigger than most CRMs.
+Takeaway: If you own the communication timeline, you own retention.
+
+Radar signals can become a unique data advantage over time.
+Takeaway: If you keep building free/public signals and scoring, competitors can’t copy your data layer easily.
+
+Network effects are possible later via benchmarks + playbooks + community.
+Takeaway: Not needed now, but it’s a real moat once you have volume in one vertical.
+
+Habit loops matter (digests, nudges, reminders).
+Takeaway: Adoption becomes routine when Cadence gives daily/weekly cues.
+
+Pricing lock-in ideas exist (annual, discounts, export friction).
+Takeaway: Don’t overdo it early, but annual plans + discounts are reasonable.
+
+Phase 5: Ruthless honesty
+
+Hardcoded industry config will choke growth.
+Takeaway: Either commit to one vertical (roofing) or build templates. Hardcoding won’t scale.
+
+Automation conditions are brittle; activity logging is too manual.
+Takeaway: You’ll accumulate “invisible bugs” unless logging becomes automatic.
+
+RLS being loose is a production emergency.
+Takeaway: If this goes live without strict RLS, multi-tenancy is compromised.
+
+State management will hurt later; add React Query early.
+Takeaway: Fix the data layer now, before complexity multiplies.
+
+Positioning warning: “CRM for everyone” loses.
+Takeaway: Your best path is own one vertical (roofing/solar/HVAC) then expand.
+
+If you only remember 7 things
+
+Fix RLS before anything else (security is existential).
+
+Communication logging is your #1 retention moat — ship it hard.
+
+Pagination + clustering + caching before scale, or it will fall over.
+
+Prospector is a differentiator, but it’s a feature; comms + workflows sell CRMs.
+
+Automations must actually “save time daily” (cron, overdue, follow-up scheduling).
+
+Stop trying to serve everyone equally — pick a vertical wedge.
+
+If multi-vertical is the plan, move industry configs to templates.
+
+If you want, I can turn those into a very aggressive build order (what to do next week vs what to ignore) tailored to how you’re shipping right now.
+
+Major takeaways - Industry system is clever but hardcoded and mismatched (CRM vs Radar).
+Takeaway: This will block you later unless you decouple/make it data-driven. The platform unintentionally favors roofing/solar/HVAC.
+Takeaway: Your Radar signals + terminology are built around residential services, not general CRM. You are overfit in a few places (photography pipeline, “residential_service” scoring).
+Takeaway: Some “industry modes” aren’t truly generic; they’re assumptions that will confuse other users.
+
+Big parts are underdeveloped: reports, communications automation, contact import/dedupe, automation actions, intake form builder.
+Takeaway: You have the skeleton of a CRM, but not enough “daily driver” convenience yet. Communication history creates switching costs bigger than most CRMs.
+Takeaway: If you own the communication timeline, you own retention. - give me a prompt to get haiku to tell me the current structure/state of each of these, and tell me how its possible to improve and expand on them - and I want to focus on this - .
+
+The platform unintentionally favors roofing/solar/HVAC.
+Takeaway: Your Radar signals + terminology are built around residential services, not general CRM. - I want this to be multi vertical - so get haiku to figure out a proper plan for that
+
+Good. This is the right move.
+
+You don’t want feature ideas.
+You want Haiku to:
+
+Audit the current implementation state
+
+Identify structural constraints
+
+Propose a clean multi-vertical architecture
+
+Tell you what to refactor vs what to keep
+
+Specifically fix the “roofing bias”
+
+Below is a high-precision strategic prompt for Claude Haiku.
+
+It forces:
+
+Codebase inspection first
+
+Honest structural analysis
+
+A real multi-vertical architecture plan
+
+Not generic advice
+
+🔥 Prompt for Haiku — Multi-Vertical Structural Audit
+
+Paste this into Haiku inside your codespace.
+
+You are a senior SaaS architect and product strategist.
+
+Your job is to analyze this codebase and give a structural audit + expansion plan.
+
+Do NOT give generic advice.
+Do NOT suggest features that ignore the existing architecture.
+Base everything on what is actually implemented in this repo.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHASE 1 — CURRENT STATE AUDIT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+For each of the following systems, describe:
+
+- Current structure
+- Where logic lives (file names / modules)
+- How data flows
+- What is hardcoded vs configurable
+- What is extensible vs brittle
+- What will break when scaling vertically
+- What assumptions are baked in
+
+Systems to audit:
+
+1) Industry System (CRM Industry Types)
+2) Radar System (Prospector / Scoring / Signals)
+3) Industry Terminology Switching
+4) Residential Service Bias (roofing/solar/HVAC assumptions)
+5) Photographer Pipeline Assumptions
+6) Reports Module
+7) Automation Engine
+8) Communication Logging
+9) Contact Model (including import/dedupe)
+10) Intake Form System
+
+Be specific. Reference file structure and architectural patterns.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHASE 2 — ROOFING BIAS ANALYSIS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The platform currently favors roofing/solar/HVAC.
+
+Explain clearly:
+
+- Where that bias exists in code.
+- Which scoring signals assume residential services.
+- Which terminology assumes job-based service businesses.
+- Which pipelines are overfit.
+- Which UI components assume service workflows.
+- Which database schema decisions reinforce that bias.
+
+Then answer:
+
+If a pure B2B SaaS company used this CRM,
+what would feel awkward or misaligned?
+
+If a creative agency used this CRM,
+what would feel forced?
+
+Be blunt.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHASE 3 — MULTI-VERTICAL ARCHITECTURE PLAN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+I want this to become truly multi-vertical.
+
+Design a proper architecture for that.
+
+Constraints:
+- Keep current tech stack (Next.js + Supabase).
+- Avoid rewriting the entire app.
+- Avoid overengineering.
+- Maintain performance.
+- Keep Radar as a differentiator.
+- Do not require paid APIs.
+
+Design:
+
+1) A unified industry abstraction system.
+   - CRM industry layer
+   - Radar industry layer
+   - Terminology layer
+   - Feature flag layer
+   - Template layer
+
+2) A database-driven industry template model.
+   - What tables are required?
+   - What should move from hardcoded files to database?
+   - What should remain code-based?
+
+3) A scoring abstraction system:
+   - How to define scoring factors per vertical.
+   - How to weight signals dynamically.
+   - How to allow future verticals without code changes.
+
+4) A vertical capability matrix:
+   - Which industries should have:
+       - Radar enabled
+       - Automation advanced mode
+       - Reporting advanced mode
+       - Communication-first workflow
+   - Make it structured.
+
+5) A migration plan:
+   - How to move from hardcoded configs to data-driven templates.
+   - Backward compatibility for existing orgs.
+   - Order of refactor steps.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHASE 4 — PRIORITY & RISK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+For each improvement area:
+
+- Industry abstraction refactor
+- Radar decoupling
+- Reports development
+- Automation expansion
+- Communication logging expansion
+- Contact import/dedupe system
+- Intake builder system
+
+Provide:
+
+- Strategic importance (Low / Medium / High / Critical)
+- Technical complexity (Low / Medium / High)
+- Risk level
+- Dependency relationships
+- Recommended order of execution
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHASE 5 — RETENTION & LOCK-IN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Specifically analyze:
+
+Communication history as a retention moat.
+
+- What is currently implemented?
+- What is missing to make it dominant?
+- What structural changes would make it 10x stronger?
+- How should it integrate with:
+    - Automations
+    - Reporting
+    - Radar
+    - Deal scoring
+
+Design a communication-first architecture direction.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FINAL OUTPUT FORMAT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Respond in structured sections:
+
+1) Current State Summary
+2) Roofing Bias Analysis
+3) Multi-Vertical Architecture Plan
+4) Migration Strategy
+5) Strategic Priority Ranking
+6) Retention Strategy Enhancement
+
+Be blunt.
+Be architectural.
+Think long-term scalability.
+Avoid generic CRM comparisons.
+Focus on this codebase.
+
+Why This Prompt Works
+
+This forces Haiku to:
+
+Inspect actual files
+
+Identify structural bias
+
+Architect a real multi-vertical system
+
+Avoid hand-wavy advice
+
+Give you a phased migration plan
+
+Tie everything back to retention
+
+When Haiku responds, paste it here.
+
+I’ll help you:
+
+• Separate real architectural risks from noise
+• Identify which refactors are actually necessary
+• Prevent you from overengineering
+• Create a realistic execution roadmap
+
+This is where Cadence either becomes a niche CRM…
+or a properly structured multi-vertical platform.
+
+Same thing, summary - regular and layman, key findings - , explain any important artichetural findings as well as the what to's and any how tos that were stated - # CADENCE CRM — STRUCTURAL AUDIT & MULTI-VERTICAL ARCHITECTURE PLAN
+## Senior SaaS Architect Analysis
+
+**Date:** February 2026  
+**Scope:** Next.js 14 + Supabase CRM  
+**Verdict:** Roofing-optimized platform masquerading as vertical-agnostic. Requires systematic decoupling.
+
+---
+
+## PHASE 1: CURRENT STATE AUDIT
+
+### 1) INDUSTRY SYSTEM (CRM INDUSTRY TYPES)
+
+**Current Structure:**
+- **File:** lib/industry-config.ts (hardcoded TypeScript)
+- **Type:** IndustryType = 'default' | 'photographer' | 'service_professional'
+- **Data Store:** In-memory config object INDUSTRY_CONFIGS record
+- **Scope:** Terminology, feature flags, pipeline templates, task templates
+
+**How It Works:**
+
+export type IndustryType = 'default' | 'photographer' | 'service_professional'
+
+export const INDUSTRY_CONFIGS: Record<IndustryType, IndustryConfig> = {
+  default: { ... },
+  photographer: { ... },
+  service_professional: { ... }
+}
+
+// Usage in components:
+const { terminology, config } = useIndustry()
+// Gets injected via context provider in layout.tsx
+
+
+**Data Flow:**
+1. Org created with industry_type field (stored in orgs table)
+2. On app load, server reads org.industry_type
+3. IndustryProvider wraps app with matching config
+4. All components access via useIndustry() hook
+5. Terminology, features, pipelines flow down through context
+
+**What Is Hardcoded:**
+- Industry types themselves (no way to add new vertical without code)
+- Terminology per industry (can't customize per org)
+- Pipeline stage names (photographer hardcoded to 8 stages)
+- Task templates (can't create custom templates)
+- Feature flags (showSalesReports, showForecast) are binary per industry
+- Default pipeline stages are generated on org creation from config
+
+**What Is Configurable:**
+- industry_type field on orgs table (after org creation, can't change?)
+- Pipeline stages can be edited post-creation (users can rename/reorder)
+- But default templates come from hardcoded config
+
+**Extensibility Issues:**
+- Adding "barbershop" vertical = deploy code + migration
+- Can't have org-specific terminology (all photographers share terminology)
+- Can't have hybrid industries (e.g., photographer + videographer)
+- Feature flags are too coarse (no granular feature control)
+
+**What Breaks at Scale:**
+- Adding 10 more verticals = massive industry-config.ts file (2000+ lines)
+- Feature flag explosion (currently 5 flags, will need 20+ for verticals)
+- Code review hell: every new vertical is a code change
+- Can't A/B test terminology or features
+
+**Baked-in Assumptions:**
+- Industries are static, known at design time
+- Terminology is uniform across all orgs in an industry
+- Pipeline stages are global per industry (not org-customizable)
+- Feature sets are determined solely by industry type
+- Task templates are prescriptive, not customizable
+
+---
+
+### 2) RADAR SYSTEM (PROSPECTOR / SCORING / SIGNALS)
+
+**Current Structure:**
+- **File:** lib/radar-config.ts (hardcoded TypeScript)
+- **Type:** RadarIndustryType with 9 variants (roofing, solar, hvac, b2b_service, commercial_service, retail, photographer, default)
+- **Data Store:** In-memory config object RADAR_CONFIGS
+- **Scope:** Data sources, signals, scoring factors, map layers, lead panel fields
+
+**How It Works:**
+
+export type RadarIndustryType =
+  | 'roofing' | 'solar' | 'hvac'           // residential service
+  | 'b2b_service' | 'commercial_service'
+  | 'retail' | 'photographer' | 'default'
+
+export const RADAR_CONFIGS: Record<RadarIndustryType, RadarIndustryConfig> = {
+  roofing: { ... },
+  solar: { ... },
+  ...
+}
+
+// Example: Residential Service Config
+const RESIDENTIAL_SERVICE_CONFIG: RadarIndustryConfig = {
+  id: 'residential_service',
+  signals: [
+    { id: 'age', label: 'Home Age', color: '#35FF7A', defaultOn: true },
+    { id: 'income', label: 'Income Tier', color: '#F59E0B', defaultOn: true },
+    { id: 'storm', label: 'Storm', color: '#FF3B3B', defaultOn: true },
+    ...
+  ],
+  panelFields: [
+    { key: 'address', label: 'Address' },
+    { key: 'propertyAge', label: 'Area Home Age' },
+    { key: 'medianIncome', label: 'Median Income' },
+    { key: 'stormProximity', label: 'Storm Proximity' },
+    ...
+  ],
+  layers: [
+    { id: 'storm-zones', label: 'Storm Zones', color: '#FF3B3B' },
+    { id: 'permit-points', label: 'Permits', color: '#3B82F6' },
+  ],
+  scoringFactors: ['Home age', 'Income tier', 'Owner occupancy', 'Storm proximity', ...]
+}
+
+
+**Data Flow:**
+1. User navigates to Prospector page
+2. App calls getRadarConfig(orgIndustryType)
+3. Config loads signals, scoring factors, map layers
+4. UI renders signal filter chips based on config.signals
+5. User selects location, filters enable/disable
+6. API calls /api/revenue-radar (not visible in code, must exist)
+7. Backend returns leads scored 0-10
+8. Map renders points colored by score
+
+**What Is Hardcoded:**
+- 9 radar industry types (roofing, solar, hvac, b2b_service, commercial, retail, photographer)
+- Signals per industry (roofing has 5 signals: age, income, owner, storm, permit)
+- Signal colors, descriptions, default on/off state
+- Map layer definitions (which data sources map to which visual layers)
+- Scoring factors (text descriptions of what affects score)
+- Max radius (roofing = 50 miles, retail = 50 miles, photographer = 30 miles)
+- Max results (roofing = 200, commercial = 300, photographer = 150)
+
+**What Is NOT Hardcoded (Inferred):**
+- Actual scoring algorithm (must be in API backend, not visible)
+- Lead enrichment data (assumed to come from external APIs: Google Places, NOAA, etc.)
+- Permit/storm data sources (assumed to be queryable APIs)
+
+**Extensibility Issues:**
+- Adding "plumbing" vertical = need new config entry (copy-paste roofing, rename)
+- Signals are hardcoded per industry (can't combine signals across verticals)
+- Scoring algorithm is unknown (coupling between config and backend logic)
+- Map layers are specific to industry (can't share "business-points" layer across verticals)
+- Panel fields are industry-specific (plumbing might need "commercial only?" filter, not in config)
+
+**What Breaks at Scale:**
+- Each new vertical adds 50-100 lines to radar-config.ts
+- Signal colors might conflict (too many similar blues)
+- Scoring algorithm assumptions embedded in backend (unknown refactoring cost)
+- Can't A/B test signals easily (would require code + deploy)
+- No way for orgs to customize signals (e.g., "for my solar company, prioritize latitude > 40N")
+
+**Baked-in Assumptions:**
+- Scoring factors are fixed per industry
+- Map layers visualize geospatial data only (no business data viz)
+- Signals are binary on/off toggles (no weighting)
+- Lead panel fields are display-only (no filtering on those fields in UI)
+- Max radius and max results are uniform across industry (no org-level customization)
+
+**Critical Gap:**
+- **Radar types ≠ CRM types**
+  - CRM has: default, photographer, service_professional
+  - Radar has: roofing, solar, hvac, b2b_service, commercial_service, retail, photographer, default
+  - Mapping is implicit in getRadarConfig() function:
+    
+typescript
+    const mapping: Record<string, RadarIndustryType> = {
+      'service_professional': 'b2b_service',
+    }
+
+  - **Problem:** If you create "barbershop" as CRM industry, it defaults to b2b_service Radar. Wrong signals.
+
+---
+
+### 3) INDUSTRY TERMINOLOGY SWITCHING
+
+**Current Structure:**
+- **File:** lib/industry-config.ts
+- **Mechanism:** Terminology field per industry
+- **Storage:** Hardcoded in config, accessed via getTerminology(industryType) function
+
+**How It Works:**
+
+typescript
+// In industry-config.ts
+default: {
+  terminology: {
+    deals: 'Deals',
+    deal: 'Deal',
+    pipeline: 'Pipeline',
+    contacts: 'Contacts',
+    ...
+  }
+},
+photographer: {
+  terminology: {
+    deals: 'Bookings',
+    deal: 'Booking',
+    pipeline: 'Booking Flow',
+    contacts: 'Clients',
+    tasks: 'To-Dos',
+    ...
+  }
+}
+
+// In components:
+const { terminology } = useIndustry()
+<h1>{terminology.deals}</h1> // Shows "Bookings" for photographers
+
+
+**Data Flow:**
+1. Org has industry_type field
+2. Component calls useIndustry()
+3. IndustryContext provides terminology object
+4. Components render terminology.deals, terminology.contacts, etc.
+
+**What Is Hardcoded:**
+- 10 terminology keys per industry
+- Terminology is static (can't change "Deals" to "Opportunities" even if you want)
+- Terminology is global per industry (all photographers see "Bookings")
+- No translation/i18n support
+
+**What Is Configurable:**
+- Nothing (it's all code)
+
+**Extensibility Issues:**
+- Adding terminology for new vertical = update config
+- Can't have org-specific terminology (all roofing orgs see "Deals")
+- Can't support multiple dialects (UK vs US English, for example)
+- No way to deprecate terminology gradually
+
+**What Breaks at Scale:**
+- International expansion: need per-language terminology (requires i18n)
+- Vertical fragmentation: sub-niches want different terminology (e.g., "Bookings" vs "Appointments" for photographers)
+- Custom terminology requests from paying customers (can't support)
+
+**Baked-in Assumptions:**
+- Terminology is uniform within an industry
+- No org-level customization
+- Terminology map is static (not versioned)
+- No A/B testing terminology changes
+
+---
+
+### 4) RESIDENTIAL SERVICE BIAS (ROOFING/SOLAR/HVAC ASSUMPTIONS)
+
+**Current Structure:**
+- **Location:** Spread across multiple systems (Radar, Industry Config, Database Schema, UI Components)
+
+**Radar Bias (lib/radar-config.ts):**
+
+Residential Service Config hardcodes signals that only apply to home contractors:
+
+typescript
+const RESIDENTIAL_SERVICE_CONFIG: RadarIndustryConfig = {
+  signals: [
+    { id: 'age', label: 'Home Age', description: 'Homes in service window for your trade' },
+    // "service window" = assumption that you replace roofs every 20-40 years
+    
+    { id: 'income', label: 'Income Tier', description: 'Median household income' },
+    // Income filters = assumption that high-income homeowners buy roofs/solar
+    
+    { id: 'owner', label: 'Owner Occupied', description: 'High homeownership areas' },
+    // Owner occupied = assumption that renters don't need roofing services
+    
+    { id: 'storm', label: 'Storm', description: 'Recent severe weather events' },
+    // Storm events = assumption that storms damage roofs (doesn't apply to solar installers in sunny regions)
+    
+    { id: 'permit', label: 'Permits', description: 'Active building permits nearby' },
+    // Permit tracking = assumption that you follow permits for leads (roofing does, landscaping doesn't)
+  ]
+}
+
+
+**Problem:** These signals are baked into the config. If a B2B SaaS company tries to use "roofing" Radar, they get home age + storm signals. Wrong.
+
+**Industry Config Bias (lib/industry-config.ts):**
+
+Photographer config is hyper-specific to event photography:
+
+typescript
+photographer: {
+  defaultPipelineStages: [
+    { name: 'Inquiry', position: 1 },
+    { name: 'Booked', position: 2 },
+    { name: 'Shoot Complete', position: 3 },
+    { name: 'Editing', position: 4 },
+    { name: 'Delivered', position: 5, is_won: true },
+    { name: 'Paid', position: 6, is_won: true },
+    { name: 'Declined', position: 7, is_lost: true },
+    { name: 'Cancelled', position: 8, is_lost: true },
+  ]
+}
+
+
+**Problem:** This assumes every photographer does events. Portrait studio photographers don't have "Shoot Complete" → "Editing" → "Delivered". They have "Inquiry" → "Shoot Scheduled" → "Shoot Done" → "Gallery Ready" → "Delivered".
+
+**Database Schema Bias:**
+
+Looking at the deals table (from 000_initial_schema.sql):
+
+sql
+CREATE TABLE deals (
+  id UUID PRIMARY KEY,
+  pipeline_id UUID,
+  stage_id UUID,
+  contact_id UUID,
+  title TEXT,
+  value DECIMAL,
+  probability INTEGER,  -- Baked assumption: deals have probability
+  expected_close_date DATE,  -- Baked: deals have a close date
+  notes TEXT,
+  ...
+)
+
+
+Schema assumptions:
+- Every deal has a stage_id (true for all industries)
+- Every deal has value and probability (true for sales, false for creative services where price is negotiated)
+- Every deal has expected_close_date (true for sales, less relevant for events that are pre-booked)
+
+Recent photographer-specific migrations added:
+
+sql
+-- From 004_photographer_booking_fields.sql
+ALTER TABLE deals ADD COLUMN (
+  booking_type TEXT,
+  num_people INTEGER,
+  event_date DATE,
+  event_start_time TIME,
+  event_end_time TIME,
+  location_type TEXT,
+  location TEXT,
+  special_requests TEXT
+)
+
+
+**Problem:** These fields only make sense for event photographers. A corporate photography agency wouldn't use these fields. They're polluting the schema.
+
+**UI Component Bias:**
+
+From app/(dashboard)/deals/[id]/page.tsx:
+
+typescript
+const isPhotographer = config.id === 'photographer'
+// Used to conditionally render photographer-specific fields
+
+// Also features like:
+interface Deal {
+  booking_type: 'personal' | 'event' | null
+  num_people: number | null
+  event_date: string | null
+  event_start_time: string | null
+  event_end_time: string | null
+  location_type: 'provided' | 'flexible' | null
+  location: string | null
+  special_requests: string | null
+}
+
+
+**Problem:** These fields are hardcoded in the schema. If you add "studio photography" vertical, you'll add different fields, creating more schema sprawl.
+
+**Automation Engine Bias:**
+
+From lib/automation-engine.ts:
+
+typescript
+export function getSuggestedTasksForStage(stageName: string): SuggestedTask[] {
+  const stage = stageName.toLowerCase()
+  
+  if (stage.includes('lead') || stage.includes('inquiry') || stage.includes('prospect')) {
+    return [
+      { title: 'Qualify deal', ... },
+      { title: 'Schedule intro call', ... },
+      { title: 'Request more info', ... }
+    ]
+  }
+  
+  if (stage.includes('proposal')) {
+    return [
+      { title: 'Send proposal', ... },
+      { title: 'Send follow-up', ... },
+      ...
+    ]
+  }
+}
+
+
+**Problem:** These suggested tasks assume a sales workflow (qualify → proposal → negotiation). For photographers, there are no proposals. For barbershops, there's no qualification (you just book).
+
+**Activity Logger Bias:**
+
+From lib/activity-logger.ts:
+
+typescript
+dealStageChanged: (deal: { 
+  old_stage: string
+  new_stage: string 
+}, ...) => {
+  logActivity({
+    type: 'deal_stage_changed',
+    subject: `${userName} moved "${deal.name}" from ${deal.old_stage} to ${deal.new_stage}`,
+    ...
+  })
+}
+
+
+**Problem:** Generic enough for all industries, but the terminology changes per industry. This works for photographers, but the language is stiff ("moved booking from Inquiry to Booked" is awkward).
+
+---
+
+### 5) PHOTOGRAPHER PIPELINE ASSUMPTIONS
+
+**Current Structure:**
+- 8 stages hardcoded in industry-config.ts
+- Each stage is prescriptive
+
+**The Stages:**
+
+1. Inquiry (lead)
+2. Booked (qualified)
+3. Shoot Complete (in-progress)
+4. Editing (in-progress, different phase)
+5. Delivered (won)
+6. Paid (won, distinct state)
+7. Declined (lost)
+8. Cancelled (lost, different from declined)
+
+
+**Assumptions This Makes:**
+- Photographers always do an inquiry phase (true for event, false for walk-in studio clients)
+- Editing is a distinct stage (true for event, false for instant portrait prints)
+- "Paid" is separate from "Delivered" (fine, but requires tracking both)
+- "Declined" and "Cancelled" are both losses (true, but conflate different behaviors)
+
+**What Different Photographer Niches Need:**
+
+**Event Photographer:**
+
+Inquiry → Deposit Paid → Booked → Shoot → Editing → Gallery Ready → Delivered → Final Paid
+
+
+**Portrait Studio:**
+
+Inquiry → Booked → Shoot → Delivered → Paid
+
+
+**Corporate/Stock Photographer:**
+
+Inquiry → Proposal Sent → Negotiation → Booked → Shoot → Delivered → Invoiced → Paid
+
+
+**Real Estate Photographer:**
+
+Agent Lead → Property Booked → Shoot → Processed → Delivered → Agent Paid
+
+
+**Problem:** The hardcoded 8 stages don't map cleanly to any of these workflows. They're "generic event photographer" stages.
+
+**What Happens When You Add New Niche:**
+- You can't. You either:
+  1. Add a new photographer sub-industry (photographer_event, photographer_studio, photographer_corporate) → code change
+  2. Let users customize stages (partially works, but task templates and automations still assume 8 stages)
+
+---
+
+### 6) REPORTS MODULE
+
+**Current Structure:**
+- **Status:** Mostly stubbed/gated
+- **Files:** Likely under app/(dashboard)/reports/ (not fully analyzed)
+- **Permission Gate:** Locked behind canAccessReports permission (false for non-admin)
+
+**What Is Implemented:**
+- Reports page exists (/dashboard/reports)
+- Reports are feature-flagged per industry (photographers can't see "Forecast" report)
+- Some report infrastructure exists in lib/reports/ (files not fully shown)
+
+**What Is Stubbed:**
+- Notification actions (automation engine has "send_notification" action but it's not implemented)
+- Report data visualizations (no charts visible in provided code)
+- Report scheduling/delivery (no scheduled reports)
+
+**Feature Flags:**
+
+typescript
+// From industry-config.ts
+default: {
+  features: {
+    showSalesReports: true,
+    showForecast: true,
+    showConversionFunnel: true,
+    showSalesVelocity: true
+  }
+},
+photographer: {
+  features: {
+    showSalesReports: false,
+    showForecast: false,
+    showConversionFunnel: false,
+    showSalesVelocity: false
+  }
+}
+
+
+**Problem:** Reports are binary (on/off) per industry. No granular control.
+
+**What Will Break at Scale:**
+- Each new report type = add new feature flag to all industries
+- Reports are data-driven (each industry needs custom reporting logic)
+- No way to customize reports per org
+- No report scheduling or automation
+
+---
+
+### 7) AUTOMATION ENGINE
+
+**Current Structure:**
+- **Files:** lib/automation-engine.ts, lib/automation-presets.ts
+- **Storage:** Database-driven (automations table)
+- **Triggers:** 8 types (contact_created, deal_created, deal_stage_changed, deal_won, deal_lost, task_completed, deal_idle_7_days, task_overdue)
+- **Actions:** 2 types (create_task, send_notification)
+- **Conditions:** User-defined (stage_is, value_greater_than, etc.)
+
+**How It Works:**
+
+typescript
+// Trigger: Deal stage changed
+export async function onDealStageChanged(context: {
+  dealId: string
+  newStageName: string
+  dealAmount?: number
+  ...
+}): Promise<{ tasksCreated: number; isWon: boolean; isLost: boolean }> {
+  const automations = await getActiveAutomations(orgId, 'deal_stage_changed')
+  
+  for (const auto of automations) {
+    // Check if stage matches (e.g., moved to "Won" stage)
+    if (!matchesStageChange(auto.trigger_config, context.newStageName, isWon, isLost)) continue
+    
+    // Check conditions (e.g., deal amount > $10k)
+    if (!matchesConditions(auto.conditions || [], ctx)) continue
+    
+    // Avoid duplicate fires within 5 minutes
+    if (await isDuplicate(auto.id, context.dealId, orgId)) continue
+    
+    // Execute actions (create task, send notification, etc.)
+    const result = await executeActions(auto.actions, ctx, auto.id, auto.name, orgId)
+  }
+}
+
+
+**Extensibility Issues:**
+- Conditions are hardcoded (stage_is, value_greater_than)
+- Can't add new condition types without code change
+- Actions only support task creation (notification is stubbed)
+- No conditional branching (if-then-else chains)
+- No delay/scheduling (always immediate)
+- No webhook actions (can't trigger external systems)
+
+**Residential Service Bias:**
+- Trigger names assume sales pipeline (deal_won, deal_lost)
+- For photographers, "deal_won" = "Delivered", not ideal terminology
+- Conditions assume numeric deal values (not all industries have prices)
+- Task templates assume sales tasks (qualify, send proposal)
+
+**What Breaks at Scale:**
+- Adding new trigger = code change + deployment
+- Adding new action = code change + deployment
+- Can't support conditional logic (e.g., "if deal > $50k, escalate to manager")
+- Deduplication logic is tight (5-minute window might be too short for cron jobs)
+
+---
+
+### 8) COMMUNICATION LOGGING
+
+**Current Structure:**
+- **Files:** components/communications/, types/communications.ts
+- **New Table:** communications (added in 009_communications.sql)
+- **Modals:** LogCallModal, LogEmailModal, LogNoteModal
+- **Timeline:** CommunicationTimeline component
+- **Actions:** Edit/Delete via three-dot menu
+
+**How It Works:**
+
+typescript
+// Communication stored in: org_id, lead_id, created_by, created_at, deleted_at
+// Fields: communication_type, direction, recipient_contact, subject, body
+
+// Log call: duration_seconds, notes
+// Log email: recipient_contact, subject, notes
+// Log SMS/note: body
+
+// Timeline filters by type, shows all non-deleted communications
+
+
+**Extensibility:**
+- Schema supports any communication_type (sms, email, call, note, in-person)
+- Soft delete ready (deleted_at timestamp)
+- Edit history support (edit_history JSONB)
+- Extensible for future types
+
+**What's Missing:**
+- SMS auto-logging from Twilio (planned, not implemented)
+- Email auto-logging from Gmail/Outlook (not even planned)
+- Email BCC handling (requires mail server)
+- Communication search/filtering (no full-text search)
+- Communication threading (no conversation grouping)
+
+**Biases:**
+- Currently focused on logging (not automation)
+- No outbound communication (can't send email from CRM)
+- No communication templates
+- No follow-up automation based on communication type
+
+---
+
+### 9) CONTACT MODEL
+
+**Current Structure:**
+- **Table:** contacts (from 000_initial_schema.sql)
+- **Fields:**
+  
+sql
+  id, org_id, first_name, last_name, email, phone, company, title,
+  linkedin_url, notes, tags[], created_by, created_at, updated_at
+
+
+**Extensibility Issues:**
+- Flat contact model (no company_id foreign key relationship)
+- company is a TEXT field, not a relationship (can't query contacts by company)
+- No de-duplication logic
+- No enrichment (no job title inference, no social profile scraping)
+- No bulk import
+- No contact scoring
+- No contact lifecycle tracking
+
+**Residential Service Bias:**
+- title field assumes people have job titles (photographers don't, clients do)
+- company field assumes people work at companies (not true for solo photographers or homeowners)
+- linkedin_url assumes professional context (not true for consumer services)
+
+**What Breaks at Scale:**
+- Can't deduplicate ("John Smith" appears 100 times)
+- Can't bulk import (no CSV loader)
+- Can't enrich (no API integration for data)
+- Can't search (no full-text search index)
+
+---
+
+### 10) INTAKE FORM SYSTEM
+
+**Current Structure:**
+- **Migration:** 006_lead_intake_form.sql (creates intake_form_templates, intake_submissions)
+- **Status:** Schema created, UI likely minimal or stubbed
+
+**Database Schema:**
+
+sql
+CREATE TABLE intake_form_templates (
+  id UUID PRIMARY KEY,
+  org_id UUID,
+  industry_type TEXT,  -- Which industry this template is for
+  name TEXT,
+  form_config JSONB,   -- Schema for form fields
+  is_active BOOLEAN,
+  created_at, updated_at
+)
+
+CREATE TABLE intake_submissions (
+  id UUID PRIMARY KEY,
+  org_id UUID,
+  template_id UUID,
+  lead_data JSONB,     -- Form submission data
+  created_at
+)
+
+
+**Extensibility Issues:**
+- No form builder UI (users can't customize intake forms)
+- Templates are per-industry, not per-org
+- Intake submissions are just JSON blobs (no structured parsing)
+- No validation or schema enforcement
+- No workflow automation from intake submissions
+
+**Residential Service Bias:**
+- Industry-specific templates assume different intake requirements
+- Roofing might ask "roof age", "number of stories", "damage type"
+- Photography might ask "event type", "date", "guest count"
+- But there's no way to customize per org
+
+**What Breaks at Scale:**
+- Can't support custom intake questions per org
+- Intake submissions are unstructured (no schema validation)
+- No way to map intake data to deal/contact fields automatically
+
+---
+
+## PHASE 2: ROOFING BIAS ANALYSIS
+
+### Where Bias Exists in Code
+
+**Radar Config (lib/radar-config.ts):**
+- Residential Service signals (home age, income, owner-occupied, storm proximity, permits)
+- These signals only make sense for roofing/solar/HVAC
+- B2B SaaS would see "Home Age" signal and be confused
+
+**Example:** If a SaaS company selects "b2b_service" industry:
+
+typescript
+const B2B_SERVICE_CONFIG: RadarIndustryConfig = {
+  signals: [
+    { id: 'low_rating', label: 'Low Rating' },
+    { id: 'no_website', label: 'No Website' },
+    { id: 'low_reviews', label: 'Few Reviews' },
+    { id: 'industry_match', label: 'Industry Match' }
+  ]
+}
+
+
+These are generic and reasonable for B2B. But the residential config is NOT generic — it's roofing-specific.
+
+**Industry Config (lib/industry-config.ts):**
+- Photographer config has 8 stages, assumes event photography
+- Service Professional config is vague (doesn't specify which services)
+- Default config is actually generic B2B sales
+
+**Terminology Bias:**
+- Photographer terminology assumes event-based workflow ("Booking", not "Project" or "Appointment")
+- No terminology for "inspection", "estimate", "permit" (roofing-specific)
+
+**Database Schema:**
+- Photographer-specific fields added to deals table (event_date, num_people, location_type)
+- These pollute schema for non-photographers
+
+**Automation Engine:**
+- Suggested tasks assume sales workflow (qualify, send proposal)
+- No automation suggestions for event-based workflow (send questionnaire, confirm booking)
+
+**UI Components:**
+- isPhotographer checks hardcoded in deal detail page
+- Other industries would need similar checks, creating component sprawl
+
+---
+
+### If a Pure B2B SaaS Company Used This CRM
+
+**Awkward Areas:**
+
+1. **Radar Signals**
+   - Would default to "b2b_service" config
+   - Gets "Low Rating" and "No Website" signals (reasonable)
+   - But these are just proxies for "bad fit"
+   - Real SaaS care about: company size, employee count, tech stack, budget
+   - Can't add custom signals without code change
+
+2. **Pipeline**
+   - Default 6-stage pipeline: Prospect → Qualified → Proposal → Negotiation → Won → Lost
+   - Works fine for SaaS sales
+   - But doesn't fit consultative B2B (Discovery → Scoping → Engagement → Delivery → Expansion)
+
+3. **Terminology**
+   - "Deals" and "Contacts" work fine
+   - But no terminology for "accounts", "companies", "decision makers"
+   - Contact model doesn't have company_id foreign key (flawed for B2B)
+
+4. **Reports**
+   - Would default to seeing sales reports
+   - But SaaS cares about ARR, MRR, churn, expansion revenue
+   - No report types for these
+
+5. **Automation**
+   - Suggested tasks are for sales (qualify, send proposal)
+   - SaaS workflow is: send trial → schedule onboarding → send invoice → track usage
+   - No automation suggestions for onboarding or renewal workflows
+
+6. **Communication**
+   - Logging calls/emails works fine
+   - But no email integration (can't send onboarding emails from CRM)
+   - No calendar integration (can't see availability)
+
+**Verdict:** A B2B SaaS company could use this, but would feel like the CRM is fighting their workflow. The pipeline, suggested tasks, and terminology would all feel slightly off.
+
+---
+
+### If a Creative Agency Used This CRM
+
+**Awkward Areas:**
+
+1. **Radar Prospecting**
+   - Would get "b2b_service" config
+   - Signals focus on existing agencies ("low rating", "no website")
+   - But creative agencies don't prospect by rating; they prospect by industry fit
+   - No signals for "design-focused", "tech company", "high-growth startup"
+   - Can't add custom signals
+
+2. **Deal Structure**
+   - Assumes each lead = one potential deal
+   - Creative agencies often have account-level deals (master agreement) + project-level deals (individual projects)
+   - Schema forces 1-to-1 contact-to-deal, but agencies need many projects per client
+
+3. **Pipeline**
+   - Sales pipeline works for "getting the contract"
+   - But project workflow is: RFP → Scope → Kickoff → Delivery → Retainer
+   - Different cadence
+
+4. **Pricing/Value**
+   - Deals table has value field (assumes fixed price)
+   - Creative agencies often work on retainers or T&M (time + materials)
+   - Can't model "10-month retainer at $8k/month" as a single deal
+
+5. **Communication**
+   - Agencies need email + Slack integration (currently not supported)
+   - Client communication happens in Slack for most agencies
+   - No Slack sync
+
+6. **Files**
+   - Agencies are document-heavy (contracts, proposals, creative files, invoices)
+   - Files table exists, but no integration with deal workflow
+   - Can't auto-attach signed contracts to deals
+
+7. **Task Types**
+   - Suggested tasks assume sales (qualify, send proposal)
+   - Agencies need: internal tasks (design, development, review), client tasks (provide feedback, approve)
+   - No distinction between internal and client-facing tasks
+
+**Verdict:** Creative agencies would fight this CRM constantly. The deal structure is wrong (should be account + projects), the pricing model is wrong (should support retainers), and the communication is missing integrations they depend on.
+
+---
+
+## PHASE 3: MULTI-VERTICAL ARCHITECTURE PLAN
+
+### 1) UNIFIED INDUSTRY ABSTRACTION SYSTEM
+
+**Current Problem:**
+- Industry config and Radar config are separate and misaligned
+- CRM industry types (default, photographer, service_professional) ≠ Radar types (roofing, solar, hvac, b2b_service, etc.)
+- No unified way to define "what is an industry?"
+
+**Proposed Architecture:**
+
+
+typescript
+// === NEW: lib/industry-abstraction/index.ts ===
+
+/**
+ * Unified industry abstraction layer.
+ * Single source of truth for industry definitions.
+ */
+
+export type VerticalId = 
+  | 'roofing' | 'solar' | 'hvac'          // Residential service
+  | 'plumbing' | 'landscaping'             // Additional residential
+  | 'b2b_saas' | 'b2b_agency'              // B2B
+  | 'photographer' | 'videographer'        // Creative
+  | 'barbershop' | 'salon' | 'tattoo'      // Recurring service
+  | 'custom'                                // Allow custom
+
+export interface VerticalDefinition {
+  id: VerticalId
+  label: string
+  description: string
+  category: 'residential-service' | 'b2b' | 'creative' | 'recurring-service' | 'custom'
+  
+  // Terminology layer
+  terminology: TerminologyConfig
+  
+  // Feature flags layer
+  features: FeatureFlagConfig
+  
+  // CRM pipeline layer
+  crm: CrmVerticalConfig
+  
+  // Prospecting/Radar layer
+  radar: RadarVerticalConfig | null
+  
+  // Reporting layer
+  reports: ReportingVerticalConfig
+  
+  // Automation layer
+  automation: AutomationVerticalConfig
+}
+
+/**
+ * CRM Layer: Pipeline, stages, templates
+ */
+export interface CrmVerticalConfig {
+  defaultPipelineStages: Array<{
+    name: string
+    position: number
+    color: string
+    is_won?: boolean
+    is_lost?: boolean
+  }>
+  defaultTaskTemplates: Array<{
+    name: string
+    description: string
+    suggestedStage?: string
+  }>
+  customFields?: Array<{
+    key: string
+    label: string
+    type: 'text' | 'number' | 'date' | 'checkbox' | 'select'
+    industrySpecific: boolean  // If true, only show for this vertical
+  }>
+  assumedDealAttributes: {
+    hasPrice: boolean
+    hasCloseDate: boolean
+    hasProbability: boolean
+    hasOwner: boolean
+  }
+}
+
+/**
+ * Terminology Layer: What do we call things?
+ */
+export interface TerminologyConfig {
+  deals: string
+  deal: string
+  pipeline: string
+  contacts: string
+  contact: string
+  tasks: string
+  task: string
+  companies: string
+  company: string
+  reports: string
+  value: string
+  dueDate: string
+  closeDate: string
+  activity: string
+}
+
+/**
+ * Feature Flags Layer: What features are available?
+ */
+export interface FeatureFlagConfig {
+  radarProspecting: boolean
+  advancedAutomation: boolean
+  emailIntegration: boolean
+  advancedReporting: boolean
+  calendarIntegration: boolean
+  bulkImport: boolean
+  customFields: boolean
+  communicationLogging: boolean
+  teamCollaboration: boolean
+}
+
+/**
+ * Radar Layer: Geospatial prospecting (null if not applicable)
+ */
+export interface RadarVerticalConfig {
+  enabled: boolean
+  maxRadiusMiles: number
+  maxResults: number
+  signals: RadarSignal[]
+  scoringFactors: string[]
+  dataSourcesAssumed: string[]  // What data we assume to query
+  panelFields: RadarPanelField[]
+  mapLayers: RadarLayerConfig[]
+}
+
+/**
+ * Reporting Layer: What reports does this vertical get?
+ */
+export interface ReportingVerticalConfig {
+  reportTypes: Array<{
+    id: string
+    label: string
+    type: 'pipeline' | 'financial' | 'forecast' | 'custom'
+    description: string
+  }>
+  metricsOfInterest: string[]  // e.g., ["close rate", "avg deal size", "sales cycle"]
+  defaultDashboardWidgets: string[]
+}
+
+/**
+ * Automation Layer: What automation triggers/actions make sense?
+ */
+export interface AutomationVerticalConfig {
+  supportedTriggers: Array<{
+    id: string
+    label: string
+    description: string
+  }>
+  supportedActions: Array<{
+    id: string
+    label: string
+    type: 'task-creation' | 'notification' | 'webhook' | 'email'
+  }>
+  suggestedPlaybooks: Array<{
+    name: string
+    description: string
+    automations: any[]
+  }>
+}
+
+/**
+ * Registry: All defined verticals
+ */
+export const VERTICALS: Record<VerticalId, VerticalDefinition> = {
+  roofing: {
+    id: 'roofing',
+    label: 'Roofing',
+    category: 'residential-service',
+    terminology: { ... },
+    features: { radarProspecting: true, advancedReporting: true, ... },
+    crm: { ... },
+    radar: { ... },
+    reports: { ... },
+    automation: { ... }
+  },
+  // ... more verticals
+}
+
+/**
+ * Get unified definition for a vertical
+ */
+export function getVerticalDefinition(verticalId: VerticalId): VerticalDefinition {
+  return VERTICALS[verticalId]
+}
+
+
+**Key Principles:**
+
+1. **Single Definition:** Each vertical has one definition
+2. **Layered:** Terminology, features, CRM, Radar, Reports, Automation are separate but connected
+3. **Explicit Assumptions:** Each layer declares what it assumes about the vertical
+4. **Extensible:** New verticals can be added by extending the record
+5. **Queryable:** Can ask "does this vertical support email integration?" and get answer
+
+---
+
+### 2) DATABASE-DRIVEN INDUSTRY TEMPLATE MODEL
+
+**Current Problem:**
+- Industry types are hardcoded in code
+- Can't add new vertical without deployment
+- Can't customize templates per org
+
+**Proposed Solution:**
+
+
+sql
+-- === NEW TABLE: industry_templates ===
+CREATE TABLE industry_templates (
+  id UUID PRIMARY KEY,
+  vertical_id TEXT NOT NULL UNIQUE,  -- 'roofing', 'photographer', etc.
+  label TEXT NOT NULL,
+  description TEXT,
+  category TEXT,  -- 'residential-service', 'b2b', 'creative', 'recurring-service'
+  
+  -- Terminology (stored as JSONB so it can be customized per-org)
+  terminology_schema JSONB NOT NULL,
+  
+  -- Features enabled/disabled for this template
+  feature_flags JSONB NOT NULL,
+  
+  -- CRM configuration
+  crm_config JSONB NOT NULL,  -- pipeline stages, task templates
+  
+  -- Radar configuration (null if not applicable)
+  radar_config JSONB,
+  
+  -- Reporting configuration
+  reporting_config JSONB NOT NULL,
+  
+  -- Automation configuration
+  automation_config JSONB NOT NULL,
+  
+  -- Versioning
+  version INTEGER DEFAULT 1,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP,
+  updated_at TIMESTAMP
+);
+
+-- === NEW TABLE: org_industry_customizations ===
+CREATE TABLE org_industry_customizations (
+  id UUID PRIMARY KEY,
+  org_id UUID NOT NULL REFERENCES orgs(id),
+  industry_template_id UUID NOT NULL REFERENCES industry_templates(id),
+  
+  -- Allow orgs to override specific parts of the template
+  terminology_overrides JSONB,  -- If null, use template defaults
+  feature_flag_overrides JSONB,
+  crm_config_overrides JSONB,
+  
+  created_at TIMESTAMP,
+  updated_at TIMESTAMP,
+  
+  UNIQUE(org_id)  -- One customization per org
+);
+
+-- === NEW TABLE: pipeline_stage_templates ===
+CREATE TABLE pipeline_stage_templates (
+  id UUID PRIMARY KEY,
+  industry_template_id UUID REFERENCES industry_templates(id),
+  name TEXT NOT NULL,
+  position INTEGER NOT NULL,
+  color TEXT,
+  is_won BOOLEAN DEFAULT FALSE,
+  is_lost BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP
+);
+
+-- === NEW TABLE: task_template_templates (yes, confusing name) ===
+CREATE TABLE task_templates (
+  id UUID PRIMARY KEY,
+  industry_template_id UUID REFERENCES industry_templates(id),
+  name TEXT NOT NULL,
+  description TEXT,
+  suggested_stage TEXT,  -- Which pipeline stage should this task appear in?
+  priority TEXT DEFAULT 'normal',
+  created_at TIMESTAMP
+);
+
+
+**What Moves from Code to Database:**
+
+| Item | Before (Code) | After (Database) | Why |
+|------|---------------|------------------|-----|
+| Industry types | Enum in TypeScript | industry_templates table | Can add verticals without deploy |
+| Pipeline stages | industry-config.ts | pipeline_stage_templates | Org can customize |
+| Task templates | industry-config.ts | task_templates | Org can customize |
+| Terminology | industry-config.ts | terminology in industry_templates | Can localize, customize |
+| Feature flags | Hardcoded objects | feature_flags JSONB | Can A/B test features |
+| Radar signals | radar-config.ts | radar_config JSONB | Can customize signals |
+
+**What Stays in Code:**
+
+| Item | Reason |
+|------|--------|
+| TypeScript interfaces for types | Type safety |
+| Validation logic | Security |
+| Default implementations | Performance (don't query for defaults) |
+| Core vertical definitions | Need to ship with app |
+
+**Migration Path:**
+
+1. Create new tables (backward compatible)
+2. Keep old hardcoded configs as defaults
+3. Update app to query database first, fall back to code configs
+4. Over time, migrate orgs from code-based to database-driven
+5. Eventually deprecate hardcoded configs
+
+---
+
+### 3) SCORING ABSTRACTION SYSTEM
+
+**Current Problem:**
+- Radar scoring algorithm is unknown (not in visible code)
+- Scoring factors are hardcoded per industry
+- Can't customize scoring without code change
+- Can't A/B test signal weightings
+
+**Proposed Solution:**
+
+
+typescript
+// === NEW: lib/industry-abstraction/scoring.ts ===
+
+export interface ScoringSignal {
+  id: string
+  label: string
+  description: string
+  type: 'geospatial' | 'demographic' | 'behavioral' | 'firmographic'
+  
+  // How to calculate this signal
+  calculator: {
+    dataSource: string  // 'google-places', 'noaa', 'census', 'permit-api', etc.
+    query: Record<string, any>  // Query parameters specific to data source
+    transform?: (value: any) => number  // Convert raw value to 0-10 score
+  }
+  
+  // Weighting in overall score
+  weight: number  // 0.0 to 1.0, sum of all weights should be 1.0
+  
+  // UI configuration
+  ui: {
+    color: string
+    icon?: string
+    defaultVisible: boolean
+  }
+}
+
+export interface ScoringModel {
+  verticalId: string
+  signals: ScoringSignal[]
+  aggregationMethod: 'weighted-average' | 'machine-learning' | 'rules-based'
+  
+  // For rules-based scoring
+  rules?: Array<{
+    condition: string  // e.g., "age < 10 AND income > 50000"
+    scoreBoost: number  // Add this to signal scores
+  }>
+  
+  // For ML-based scoring
+  mlModel?: {
+    modelUrl: string  // Path to trained model
+    features: string[]  // Feature names expected by model
+    outputRange: [number, number]  // Typically [0, 10]
+  }
+}
+
+/**
+ * Calculate composite lead score
+ */
+export async function calculateLeadScore(
+  signals: Record<string, number>,  // {signal_id: score}
+  scoringModel: ScoringModel
+): Promise<number> {
+  if (scoringModel.aggregationMethod === 'weighted-average') {
+    let totalScore = 0
+    let totalWeight = 0
+    
+    for (const signal of scoringModel.signals) {
+      const value = signals[signal.id] || 0
+      totalScore += value * signal.weight
+      totalWeight += signal.weight
+    }
+    
+    return totalWeight > 0 ? totalScore / totalWeight : 0
+  }
+  
+  if (scoringModel.aggregationMethod === 'machine-learning') {
+    // Call ML service
+    const features = scoringModel.mlModel!.features.map(f => signals[f] || 0)
+    const score = await callMLModel(scoringModel.mlModel!.modelUrl, features)
+    return score
+  }
+  
+  // rules-based
+  return applyRules(signals, scoringModel.rules || [])
+}
+
+/**
+ * Get signals for a vertical
+ */
+export function getScoringModel(verticalId: string): ScoringModel {
+  // Query database for scoring model definition
+  // Fall back to code defaults
+}
+
+
+**How Scoring Models Are Defined:**
+
+**Roofing Vertical:**
+
+json
+{
+  "verticalId": "roofing",
+  "signals": [
+    {
+      "id": "home_age",
+      "label": "Home Age",
+      "weight": 0.25,
+      "calculator": {
+        "dataSource": "census",
+        "query": { "medianYearBuilt": true }
+      }
+    },
+    {
+      "id": "income_tier",
+      "label": "Median Income",
+      "weight": 0.15,
+      "calculator": {
+        "dataSource": "census",
+        "query": { "medianIncome": true }
+      }
+    },
+    {
+      "id": "storm_proximity",
+      "label": "Recent Storms",
+      "weight": 0.35,
+      "calculator": {
+        "dataSource": "noaa",
+        "query": { "daysBack": 30 }
+      }
+    },
+    {
+      "id": "owner_occupied",
+      "label": "Owner Occupied",
+      "weight": 0.15,
+      "calculator": {
+        "dataSource": "census",
+        "query": { "ownerOccupied": true }
+      }
+    }
+  ],
+  "aggregationMethod": "weighted-average"
+}
+
+
+**Photographer Vertical:**
+
+json
+{
+  "verticalId": "photographer",
+  "signals": [
+    {
+      "id": "venue_popularity",
+      "label": "Popular Venue",
+      "weight": 0.4,
+      "calculator": {
+        "dataSource": "google-places",
+        "query": { "rating": true, "reviewCount": true }
+      }
+    },
+    {
+      "id": "event_frequency",
+      "label": "Event Frequency",
+      "weight": 0.3,
+      "calculator": {
+        "dataSource": "event-api",
+        "query": { "eventsPerMonth": true }
+      }
+    },
+    {
+      "id": "accessibility",
+      "label": "Accessibility",
+      "weight": 0.2,
+      "calculator": {
+        "dataSource": "google-places",
+        "query": { "wheelchairAccessible": true }
+      }
+    }
+  ],
+  "aggregationMethod": "weighted-average"
+}
+
+
+**B2B SaaS Vertical:**
+
+json
+{
+  "verticalId": "b2b_saas",
+  "signals": [
+    {
+      "id": "company_size",
+      "label": "Company Size",
+      "weight": 0.3,
+      "calculator": {
+        "dataSource": "clearbit",
+        "query": { "employeeCount": true }
+      }
+    },
+    {
+      "id": "funding_stage",
+      "label": "Funding Stage",
+      "weight": 0.3,
+      "calculator": {
+        "dataSource": "crunchbase",
+        "query": { "latestFunding": true }
+      }
+    },
+    {
+      "id": "industry_match",
+      "label": "Industry Match",
+      "weight": 0.4,
+      "calculator": {
+        "dataSource": "industry-list",
+        "query": { "targetIndustries": ["SaaS", "FinTech", "MarTech"] }
+      }
+    }
+  ],
+  "aggregationMethod": "machine-learning",
+  "mlModel": {
+    "modelUrl": "https://api.cadence.com/models/b2b-saas-score",
+    "features": ["company_size", "funding_stage", "industry_match"],
+    "outputRange": [0, 10]
+  }
+}
+
+
+**Benefits:**
+
+1. **No Code Change to Add Signal:** Add row to signals definition
+2. **Customizable Scoring:** Org can override weights
+3. **A/B Testable:** Can test roofing_scoring_v1 vs roofing_scoring_v2
+4. **Data Source Agnostic:** Can swap Google Places for Yelp without code change
+5. **ML-Ready:** Can gradually move from rules to ML
+
+---
+
+### 4) VERTICAL CAPABILITY MATRIX
+
+**Current Problem:**
+- Feature flags are binary (on/off)
+- No structured way to say "this vertical gets these features"
+- Hard to plan new features knowing which verticals should get them
+
+**Proposed Solution:**
+
+
+typescript
+// === NEW: lib/industry-abstraction/capabilities.ts ===
+
+export type FeatureId =
+  | 'radar-prospecting'
+  | 'advanced-automation'
+  | 'email-integration'
+  | 'advanced-reporting'
+  | 'calendar-integration'
+  | 'bulk-import'
+  | 'custom-fields'
+  | 'communication-logging'
+  | 'team-collaboration'
+  | 'ai-recommendations'
+  | 'payment-tracking'
+  | 'inventory-management'
+  | 'time-tracking'
+
+export interface CapabilityMatrix {
+  [verticalId: string]: {
+    [featureId: string]: {
+      enabled: boolean
+      reason: string  // Why does/doesn't this vertical get this feature?
+      tier: 'free' | 'pro' | 'enterprise'  // Which pricing tier?
+      notes?: string
+    }
+  }
+}
+
+export const CAPABILITY_MATRIX: CapabilityMatrix = {
+  roofing: {
+    'radar-prospecting': {
+      enabled: true,
+      reason: 'Core feature for roofing companies',
+      tier: 'free'
+    },
+    'advanced-automation': {
+      enabled: true,
+      reason: 'Storm response playbooks require advanced conditions',
+      tier: 'pro'
+    },
+    'email-integration': {
+      enabled: true,
+      reason: 'Used to send estimates and follow-ups',
+      tier: 'pro'
+    },
+    'payment-tracking': {
+      enabled: true,
+      reason: 'Track invoice and payment status',
+      tier: 'free'
+    },
+    'time-tracking': {
+      enabled: false,
+      reason: 'Not relevant for roofing (job-based, not time-based)',
+      tier: null
+    }
+  },
+  
+  photographer: {
+    'radar-prospecting': {
+      enabled: true,
+      reason: 'Scout shooting locations',
+      tier: 'pro'
+    },
+    'advanced-automation': {
+      enabled: true,
+      reason: 'Automated questionnaires, deposit reminders',
+      tier: 'pro'
+    },
+    'email-integration': {
+      enabled: true,
+      reason: 'Send questionnaires, gallery links, invoices',
+      tier: 'pro'
+    },
+    'calendar-integration': {
+      enabled: true,
+      reason: 'Schedule shoots, manage availability',
+      tier: 'pro'
+    },
+    'payment-tracking': {
+      enabled: true,
+      reason: 'Track deposits and final payments',
+      tier: 'free'
+    },
+    'time-tracking': {
+      enabled: false,
+      reason: 'Not relevant for photographers',
+      tier: null
+    }
+  },
+  
+  b2b_saas: {
+    'radar-prospecting': {
+      enabled: true,
+      reason: 'Prospect similar companies',
+      tier: 'free'
+    },
+    'advanced-automation': {
+      enabled: true,
+      reason: 'Onboarding workflows, renewal reminders',
+      tier: 'pro'
+    },
+    'email-integration': {
+      enabled: true,
+      reason: 'Critical for email-based sales',
+      tier: 'free'
+    },
+    'calendar-integration': {
+      enabled: true,
+      reason: 'Schedule demos and meetings',
+      tier: 'free'
+    },
+    'payment-tracking': {
+      enabled: true,
+      reason: 'Track ARR, MRR, usage-based billing',
+      tier: 'pro'
+    },
+    'time-tracking': {
+      enabled: true,
+      reason: 'Track professional services time',
+      tier: 'pro'
+    }
+  },
+  
+  barbershop: {
+    'radar-prospecting': {
+      enabled: false,
+      reason: 'Barbershops rely on repeat customers, not cold outreach',
+      tier: null
+    },
+    'advanced-automation': {
+      enabled: true,
+      reason: 'Appointment reminders, loyalty program automation',
+      tier: 'free'
+    },
+    'email-integration': {
+      enabled: true,
+      reason: 'Send appointment reminders, promotions',
+      tier: 'free'
+    },
+    'calendar-integration': {
+      enabled: true,
+      reason: 'Schedule appointments',
+      tier: 'free'
+    },
+    'payment-tracking': {
+      enabled: true,
+      reason: 'Track repeat customer LTV',
+      tier: 'free'
+    },
+    'time-tracking': {
+      enabled: false,
+      reason: 'Not relevant (time = appointment duration)',
+      tier: null
+    }
+  }
+}
+
+/**
+ * Check if vertical supports feature
+ */
+export function verticalSupportsFeature(
+  verticalId: string,
+  featureId: FeatureId,
+  tier?: 'free' | 'pro' | 'enterprise'
+): boolean {
+  const capability = CAPABILITY_MATRIX[verticalId]?.[featureId]
+  if (!capability) return false
+  if (!capability.enabled) return false
+  if (tier && capability.tier && !isTierIncluded(tier, capability.tier)) return false
+  return true
+}
+
+/**
+ * Get features available to vertical
+ */
+export function getFeaturesForVertical(
+  verticalId: string,
+  tier?: 'free' | 'pro' | 'enterprise'
+): FeatureId[] {
+  const capabilities = CAPABILITY_MATRIX[verticalId] || {}
+  return Object.entries(capabilities)
+    .filter(([_, cap]) => cap.enabled && (!tier || isTierIncluded(tier, cap.tier)))
+    .map(([featureId]) => featureId as FeatureId)
+}
+
+
+**Benefits:**
+
+1. **Clear Feature Roadmap:** Can see which verticals get which features
+2. **Easier Feature Planning:** When adding email integration, know which verticals should get it
+3. **Pricing Strategy:** Can see which features are free vs pro vs enterprise per vertical
+4. **Justification:** Explicit reason why feature is/isn't available
+5. **Documentation:** Clear table for support team and customers
+
+---
+
+### 5) MIGRATION PLAN
+
+**Phase 1: Create Database Tables (Week 1)**
+- Create industry_templates, org_industry_customizations, pipeline_stage_templates, task_templates
+- No data migration yet, just schema
+- Deploy with feature flag disabled
+
+**Phase 2: Update App to Query Database (Weeks 2-3)**
+- Create new functions that query database first, fall back to code configs
+- Update IndustryProvider to use new logic
+- Keep old code configs working in parallel
+- No changes visible to users
+
+**Phase 3: Seed Initial Data (Week 3)**
+- Migrate hardcoded INDUSTRY_CONFIGS to industry_templates
+- Migrate hardcoded RADAR_CONFIGS to industry_templates.radar_config
+- One-time migration script
+
+**Phase 4: Enable Database-Driven Configs (Week 4)**
+- Feature flag: use database configs
+- All existing orgs get migrated automatically (via database)
+- No code changes to orgs, they keep their industry_type
+
+**Phase 5: UI for Customization (Weeks 5-6)**
+- Build admin UI to edit terminology
+- Build admin UI to edit feature flags per org
+- Build admin UI to create custom vertical (only for internal use initially)
+
+**Phase 6: Deprecate Code Configs (Week 7+)**
+- Remove hardcoded configs from code
+- Move industry definitions to separate package (can be versioned)
+- Orgs now entirely database-driven
+
+**Backward Compatibility:**
+- All existing orgs continue to work (they reference industry_type, which maps to database template)
+- When you add new vertical, existing orgs don't change
+- Customizations are additive (if org doesn't override terminology, uses template default)
+
+---
+
+## PHASE 4: PRIORITY & RISK
+
+### Strategic Importance Ranking
+
+| Improvement | Importance | Complexity | Risk | Dependencies | Recommended Timeline |
+|---|---|---|---|---|---|
+| **Industry abstraction refactor** | **CRITICAL** | High | Medium | None (can run parallel) | Weeks 1-4 |
+| **Radar decoupling** | **HIGH** | Medium | Medium | Depends on industry abstraction | Weeks 5-6 |
+| **Database-driven templates** | **CRITICAL** | Medium | Low | Industry abstraction (Phase 1) | Weeks 1-3 |
+| **Scoring abstraction** | **HIGH** | High | High | Radar decoupling | Weeks 7-8 |
+| **Communication logging** | **HIGH** | Medium | Low | None | Weeks 1-2 (parallel) |
+| **Reports development** | **MEDIUM** | High | Medium | Feature flags system | Weeks 5-6 |
+| **Automation expansion** | **MEDIUM** | High | Medium | Scoring system | Weeks 8-10 |
+| **Contact import/dedupe** | **MEDIUM** | Medium | Low | None | Weeks 3-4 |
+| **Intake form builder** | **LOW** | Medium | Low | Feature flags system | Weeks 9-10 |
+
+### Dependency Graph
+
+
+Communication Logging (parallel)
+    ↓
+Industry Abstraction ← Database-Driven Templates
+    ↓
+Feature Flags System
+    ↓
+Reports Development
+    ↓
+Radar Decoupling
+    ↓
+Scoring Abstraction
+    ↓
+Automation Expansion
+    ↓
+Intake Form Builder
+
+
+### Critical Path
+
+The critical path (fastest possible project):
+1. **Industry Abstraction** (2 weeks) — Must complete first
+2. **Database-Driven Templates** (1 week) — Unblocks everything
+3. **Radar Decoupling** (1 week)
+4. **Scoring Abstraction** (2 weeks)
+5. **Automation Expansion** (1 week)
+
+**Total: 7 weeks to full multi-vertical parity**
+
+### Risk Assessment
+
+**High Risk:**
+- **Scoring Abstraction** — Unknown algorithm complexity, might need API changes
+- **Radar Decoupling** — Lots of geospatial logic, easy to break prospecting
+
+**Medium Risk:**
+- **Industry Abstraction** — Large refactor, but can run tests in parallel
+- **Reports Development** — Depends on feature flags working correctly
+
+**Low Risk:**
+- **Communication Logging** — Self-contained, no dependencies
+- **Database-Driven Templates** — Just adding new tables, can coexist with code configs
+- **Contact Import/Dedupe** — Self-contained feature
+
+---
+
+## PHASE 5: RETENTION & LOCK-IN
+
+### Communication History as Retention Moat
+
+**What Is Currently Implemented:**
+- Communications table with call, email, SMS, note types
+- LogCallModal, LogEmailModal, LogNoteModal components
+- CommunicationTimeline for display
+- Edit/delete/soft-delete support
+- No auto-logging (must be manual or native call/email app)
+
+**What Is Missing to Make It Dominant:**
+
+1. **Search & Discovery**
+   - Can't find "emails sent to John Smith in January"
+   - No full-text search on communication bodies
+   - No conversation threading
+
+2. **Integration Points**
+   - No Twilio auto-logging (planned but not implemented)
+   - No Gmail/Outlook sync
+   - No Slack integration (communications mentioned in Slack don't sync to CRM)
+
+3. **Intelligence**
+   - No communication sentiment analysis
+   - No automatic follow-up suggestions based on communication history
+   - No "customer communication score" (are we communicating enough?)
+
+4. **Data Export Prevention**
+   - All communications are exportable (shouldn't be)
+   - No API limit on fetching communications (can bulk export)
+
+5. **Habit Formation**
+   - Logging is optional (easy to skip)
+   - No notifications when communication missing (e.g., "no contact with John in 30 days")
+   - No gamification (e.g., "logging streak")
+
+---
+
+### Structural Changes to Make Communications 10x Stronger
+
+**1. Make Communications the Primary Entity, Not Secondary**
+
+**Current Architecture:**
+
+Deal
+  ├── Tasks
+  ├── Activities (generic events)
+  └── Communications (optional, secondary)
+
+
+**Proposed Architecture:**
+
+Communication (PRIMARY)
+  ├── Associated Deal (optional)
+  ├── Associated Contact (required)
+  ├── Linked Communications (conversations)
+  └── Derived Insights (sentiment, action items, next steps)
+
+
+**Why:**
+- Users log communication first ("I called John")
+- System infers deal context ("Likely about roofing estimate")
+- Task is optional ("Already covered in call, don't need explicit task")
+- Reps spend 70% of time in email/calls, 30% in CRM
+- Make CRM follow communication flow, not vice versa
+
+**Implementation:**
+
+typescript
+// New approach: Log Communication First
+const onCommunicationLogged = async (comm: Communication) => {
+  // Step 1: Smart linking
+  const likelyDeals = await findDealsForContact(comm.contact_id)
+  const likelyDeal = await askUserToConfirm(likelyDeals[0])
+  
+  // Step 2: Extract insights
+  const sentiment = analyzeTextSentiment(comm.body)
+  const actionItems = extractActionItems(comm.body)
+  const nextStepInferred = inferNextStep(comm.type, sentiment)
+  
+  // Step 3: Auto-create follow-up task if needed
+  if (sentiment === 'negative' || actionItems.length > 0) {
+    await suggestFollowUpTask(comm.deal_id, actionItems, nextStepInferred)
+  }
+  
+  // Step 4: Log activity (automatic)
+  await logActivity('communication_logged', comm)
+}
+
+
+**2. Make Auto-Logging Mandatory, Not Optional**
+
+**Current:**
+- Manual logging only (or native call/email app)
+- Users forget to log
+- Incomplete history
+
+**Proposed:**
+- All communications auto-logged by default
+- Users can manually add context/notes
+- Logging is transparent, not a task
+
+**Implementation Path:**
+1. Twilio Voice SDK integration (auto-log calls made from CRM)
+2. Gmail/Outlook plugin (auto-log emails)
+3. Slack integration (auto-log mentions)
+4. SMS forwarding (auto-log text messages)
+5. Email BCC (auto-log external emails)
+
+**Impact:** Once auto-logging is on, users can't use external email/calls without sync. High switching cost.
+
+---
+
+### Integration with Automations
+
+**Current Automation Triggers:**
+- contact_created, deal_created, deal_stage_changed, deal_won, deal_lost, task_completed, deal_idle_7_days, task_overdue
+
+**New Communication-Based Triggers:**
+
+typescript
+export type CommunicationTrigger =
+  | 'communication_logged'           // When any comm is logged
+  | 'call_logged'                     // Specifically a call
+  | 'email_logged'                    // Specifically an email
+  | 'communication_no_response_7days' // Sent message, no response
+  | 'communication_negative_sentiment' // Detected negative tone
+  | 'communication_action_items'      // Message contains action items
+  | 'communication_mentions_competitor' // Message mentions competitor name
+
+
+**Automation Examples:**
+
+Trigger: communication_negative_sentiment
+Condition: message sentiment < 0.3
+Action: Create task "Address customer concern"
+
+Trigger: communication_logged (type = call)
+Condition: Call longer than 20 minutes
+Action: Create task "Follow up on discussion points"
+
+Trigger: communication_no_response_7days
+Condition: Sent email > 7 days ago, no response
+Action: Create task "Check in on proposal"
+
+
+---
+
+### Integration with Reporting
+
+**Current Reports:**
+- Generic sales reports (conversion funnel, velocity)
+- Limited to non-photographer orgs
+
+**New Communication-Based Reports:**
+
+Communication Cadence Report:
+- How many comms per deal (avg)
+- How many comms per contact (avg)
+- Days between communications
+- Alert: Deals without communication in 7+ days
+
+Communication Sentiment Dashboard:
+- % of communications with positive sentiment
+- Trending sentiment (is customer mood improving?)
+- Alerts for negative sentiment spikes
+
+Next Step Tracking:
+- % of communications with clear next step
+- % of next steps completed on time
+- Which next steps are most common (proposals, callbacks, etc.)
+
+Communication ROI:
+- Deals closed with >X communications
+- Average revenue per communication
+- Best communication timing (when do we get responses?)
+
+
+**How This Increases Retention:**
+- Reports show that logging communications predicts deal close
+- Reps see the correlation: more comms → more deals
+- Reps become dependent on communication data for reporting
+- Can't leave CRM without losing insights
+
+---
+
+### Integration with Radar (Prospecting)
+
+**Current Radar:**
+- Finds leads based on geospatial signals
+- Leads are qualified by other factors
+
+**New Communication-Informed Prospecting:**
+
+Lead Scoring = Geospatial Signals + Communication Signals
+
+Geospatial (50%):
+- Home age
+- Income tier
+- Storm proximity
+
+Communication (50%):
+- Has active communication (vs cold lead)
+- Sentiment positive (vs negative)
+- Has clear next step (vs stalled)
+- Recent communication (vs inactive for 30+ days)
+
+Example: Same neighborhood property
+- Without communication: 6.2/10 score
+- With recent positive email: 8.5/10 score
+- With cold email after 6 months: 4.2/10 score
+
+
+**How This Works:**
+1. Reps use Radar to find property
+2. Reps log call/email with property owner
+3. Next time Radar refreshes, property owner's score increases
+4. System learns which properties become customers
+5. Over time, Radar becomes more accurate for this org
+
+**How This Increases Lock-In:**
+- Communication history directly improves prospecting quality
+- More comms → better Radar scores → more deals
+- Switching means losing all historical communication data
+- System gets smarter the longer you stay
+
+---
+
+### Integration with Deal Scoring
+
+**Current Deal Scoring:**
+- Probability field in schema, but never updated
+
+**New Communication-Informed Scoring:**
+
+Deal Probability = Baseline + Communication Signals
+
+Baseline (40%):
+- Pipeline stage (20 points if in Proposal, 10 if in Qualified)
+- Deal age (newer deals 80%, old deals 20%)
+- Contact engagement (has more than 1 deal = 20 bonus)
+
+Communication Signals (60%):
+- Number of communications (more = higher probability)
+- Communication frequency (consistent contact = higher)
+- Sentiment trend (improving sentiment = higher)
+- Time since last communication (recent = higher)
+- Response rate (quick responses = higher)
+- Next step clarity (clear next step = higher)
+
+Example:
+- Deal in Proposal stage, 2 weeks old, 3 communications, positive sentiment
+- Baseline: 20 + 10 = 30
+- Communication score: 12 + 8 + 10 + 9 + 8 + 5 = 52
+- Total: 82% probability
+
+vs.
+
+- Same deal, no communications
+- Baseline: 20 + 10 = 30
+- Communication score: 0
+- Total: 30% probability
+
+
+**Execution:**
+
+typescript
+// Recalculate deal probability based on communications
+export async function updateDealProbability(dealId: string) {
+  const deal = await getDeal(dealId)
+  const communications = await getCommunications(dealId)
+  const sentiment = await analyzeCommunicationSentiment(communications)
+  const frequency = calculateCommunicationFrequency(communications)
+  const recency = calculateRecency(communications)
+  
+  const newProbability = calculateProbability({
+    stageId: deal.stage_id,
+    dealAge: deal.created_at,
+    comms: communications.length,
+    sentiment,
+    frequency,
+    recency
+  })
+  
+  await updateDeal(dealId, { probability: newProbability })
+}
+
+// Run after every communication is logged
+export async function onCommunicationLogged(comm: Communication) {
+  await updateDealProbability(comm.deal_id)
+  await updateContactEngagementScore(comm.contact_id)
+  await updateDealScoreInRadar(comm.deal_id)
+}
+
+
+---
+
+### Communication-First Workflow Direction
+
+**Goal:** Make Cadence feel like "Gmail for Sales" not "Salesforce with extra steps"
+
+**UX Shift:**
+
+**Old Workflow:**
+1. Go to /deals
+2. Find deal
+3. Click "Log Communication"
+4. Fill modal
+5. Back to deal detail
+
+**New Workflow:**
+1. User in Gmail, receives email
+2. Gmail extension: "Quick log" button
+3. Tap button, modal in Gmail sidebar
+4. One-click logging
+5. Deal context auto-inferred
+6. Back to email
+
+**OR:**
+
+1. User receives call through CRM Slack integration
+2. Slack shows "Log this call?" prompt
+3. Tap "Log", fill 30-second form
+4. Back to Slack
+5. Deal context auto-inferred
+
+**Key Insight:** Don't make users come to CRM to log communication. Meet them where communication happens (email, Slack, phone).
+
+---
+
+### Data Lock-In Mechanics
+
+**Why Communication Data = Unbreakable Lock-In:**
+
+1. **Volume:** 500+ communications per rep per year
+2. **Context:** Each communication has deal, contact, date, sentiment — highly contextual
+3. **Irreplaceability:** Can't retroactively log external communications (you weren't there to catch them)
+4. **Historical:** Value compounds over time (3 years of history is exponentially more valuable than 3 months)
+5. **Competitive Advantage:** Only Cadence has this data for this user
+
+**Switching Cost Calculation:**
+- Time to log missing communications: 500 comms × 5 min = 41 hours
+- Reps won't pay this cost
+- Competitor can't import this data (it's lost)
+- Result: Forced to stay in Cadence
+
+**How to Make This Obvious to Users:**
+- "You have 1,847 communications logged" (dashboard widget)
+- "Your 3-year communication history is worth $X" (pricing page)
+- "If you leave, you'll lose access to all communication history" (warning on export)
+- "Communication history has predicted 42 of your last 50 closed deals" (report)
+
+---
+
+## FINAL SUMMARY & RECOMMENDED ACTION
+
+### Current State
+
+Cadence is roofing-optimized masquerading as vertical-agnostic.
+
+- ✅ Solid foundations (auth, multi-tenancy, automation)
+- ❌ Roofing bias in every system (Radar, industry config, terminology, schema)
+- ❌ Photographer feels like an afterthought (8 rigid stages)
+- ❌ B2B SaaS would feel misaligned (wrong suggested tasks, wrong terminology)
+- ❌ Communication logging is only half-baked (no auto-logging, not integrated)
+
+### 7-Week Roadmap to Multi-Vertical Parity
+
+**Weeks 1-4: Foundation (Industry Abstraction)**
+- Create unified industry definition system
+- Move hardcoded configs to database
+- Build feature flag infrastructure
+- Result: Can add new vertical without code change
+
+**Weeks 5-6: Prospecting (Radar Decoupling)**
+- Decouple Radar from CRM industry types
+- Allow custom scoring signals per org
+- Result: Each vertical gets appropriate prospecting signals
+
+**Weeks 7-8: Intelligence (Scoring System)**
+- Build pluggable scoring engine
+- Support rules-based, weighted, and ML-based scoring
+- Result: Scoring is transparent, customizable, testable
+
+**Weeks 9-10: Capabilities (Feature Matrix)**
+- Build capability matrix system
+- Implement feature gating based on vertical + tier
+- Result: Clear feature roadmap, easy to add features
+
+**Weeks 11-12: Communication (Retention)**
+- Implement Twilio SMS auto-logging
+- Build communication-first workflows
+- Integrate communications into deal scoring
+- Result: Communication data becomes unbreakable lock-in
+
+### Vertical Priority
+
+**Phase 1 (Ship Now):**
+- Roofing (fully optimize)
+- Solar (extend roofing)
+- Photographer (extend with sub-types: event, studio, corporate)
+
+**Phase 2 (Months 2-3):**
+- B2B SaaS (different scoring, different automation)
+- B2B Agency (account + projects model)
+
+**Phase 3 (Months 4-6):**
+- Barbershop, Salon, Tattoo (recurring service model)
+- Landscaping, Plumbing (extend residential service)
+
+### Success Metrics
+
+- **Within 3 months:** Can add new vertical with 0 code changes
+- **Within 6 months:** 70% of new orgs are non-roofing
+- **Within 12 months:** Each vertical has 2+ unique features
+- **Communication logging:** >90% of deals have >3 logged communications
+- **Retention:** Orgs with 100+ logged communications churn at <2%/month
+
+---
+
+**End of Audit**
+
+Below is the same thing but cleaned into:
+
+Key findings (what matters)
+
+Regular terms + layman terms
+
+Important architectural findings (the “structure problems”)
+
+What to do + how to do it (concrete steps the doc recommends)
+
+1) Overall verdict
+
+Regular
+
+Cadence is roofing-optimized but looks like it’s “multi-vertical.”
+
+To truly go multi-vertical, you must decouple + template-ize the industry system (CRM + Radar + terminology + features).
+
+Layman
+
+Right now it’s basically built for roofers, even if it doesn’t say that.
+
+If you want it to work for lots of industries, you need to stop hardcoding everything and make it “plug-and-play.”
+
+Key finding
+
+Your biggest blocker is hardcoded industry logic + misalignment between CRM industry vs Radar industry.
+
+2) Industry System (CRM industry types)
+
+Key findings
+
+CRM has only 3 hardcoded industries (default, photographer, service_professional) in lib/industry-config.ts.
+
+That config controls terminology, feature flags, default pipeline stages, task templates.
+
+Adding a new vertical currently requires code changes + deploy.
+
+Regular
+
+Your industry layer is a TS enum + in-memory object. It’s not scalable.
+
+Feature flags are coarse and industry-based only. No org-level customization.
+
+This becomes “config-file hell” as verticals grow.
+
+Layman
+
+You can’t add “plumbing” or “salon” without changing code and redeploying.
+
+Everyone in the same industry gets the same words and workflow even if they want different ones.
+
+What to do + how
+
+Move industry definitions to the database (industry templates).
+
+Add org-level overrides so customers can tweak wording/workflows without you shipping code.
+
+3) Radar System (prospector/scoring/signals)
+
+Key findings
+
+Radar is also hardcoded (lib/radar-config.ts) with ~9 types (roofing/solar/hvac/etc).
+
+Radar controls signals, map layers, panel fields, max radius, max results.
+
+The scoring algorithm itself isn’t visible here (likely lives in an API route).
+
+Regular
+
+Radar is flexible in concept but still code-driven.
+
+Adding signals or combining signals across verticals is not data-driven.
+
+Radar types don’t match CRM types, so orgs often end up with the “wrong” Radar behavior.
+
+Layman
+
+The map system has good bones, but you still have to “edit the engine” for every new industry.
+
+A new industry would basically mean copy-paste another Radar config.
+
+What to do + how
+
+Create a unified vertical definition so CRM + Radar are aligned.
+
+Store Radar configs in DB so you can add/edit signals without deploying.
+
+4) Terminology switching
+
+Key findings
+
+Terminology is hardcoded per industry; orgs cannot customize.
+
+No i18n/translation system; no versioning.
+
+Regular
+
+This will break with:
+
+paid customers wanting custom wording
+
+sub-niches (“Bookings” vs “Appointments”)
+
+expansion to other countries/languages
+
+Layman
+
+If someone wants “Opportunities” instead of “Deals,” you can’t support it without changing code.
+
+What to do + how
+
+Put terminology into industry_templates (DB JSON).
+
+Allow org overrides (terminology_overrides JSON).
+
+5) Roofing bias + overfit (the big problem)
+
+Key findings
+
+Residential service assumptions are embedded across:
+
+Radar signals (home age, income, owner occupied, storm, permits)
+
+Photographer pipeline stages (event-based)
+
+Schema (photographer-specific fields added directly to deals)
+
+Suggested tasks in automation engine (sales-y workflow)
+
+Regular
+
+Your “multi-vertical” claim will fail because the platform assumes:
+
+homeowner targeting
+
+storms and permits
+
+sales funnels
+
+event photography workflows
+
+Schema is starting to “sprawl” because you add industry fields directly to deals.
+
+Layman
+
+Other industries will feel like the app is “built for someone else.”
+
+You’re adding special fields into the main deal table, and that’s going to turn into a mess.
+
+What to do + how
+
+Stop adding industry-specific columns to deals.
+
+Use custom_fields / vertical_fields tables or JSONB per vertical.
+
+Make tasks/pipelines come from vertical templates, not hardcoded logic.
+
+6) Photographer pipeline assumptions
+
+Key findings
+
+Photographer pipeline is a single rigid 8-stage workflow.
+
+Doesn’t match most photographer sub-types (studio, real estate, corporate, etc).
+
+Regular
+
+You need sub-templates (event, studio, real-estate, corporate).
+
+Or the “photographer vertical” will always feel wrong for most photographers.
+
+Layman
+
+Photographers don’t all work the same way. Your workflow is “one kind of event photographer.”
+
+What to do + how
+
+Make pipelines template-based:
+
+photographer_event
+
+photographer_studio
+
+photographer_real_estate
+
+photographer_corporate
+
+Let org choose template or customize stages.
+
+7) Reports module
+
+Key findings
+
+Reports exist but are mostly stubbed/gated.
+
+Report toggles are binary per industry and will explode as you add report types.
+
+Regular
+
+Reporting needs a “vertical metrics” approach, not generic dashboards only.
+
+You need better feature gating than per-industry boolean flags.
+
+Layman
+
+Reporting is half-built and will get messy as you add more industries.
+
+What to do + how
+
+Move report availability to the capability matrix (vertical + tier).
+
+Define vertical report templates (roofing metrics ≠ photographer metrics).
+
+8) Automation engine
+
+Key findings
+
+Good base (triggers, conditions, actions), but:
+
+limited actions (notification stubbed)
+
+conditions are hardcoded types
+
+no delays/scheduling/branching
+
+Suggested tasks assume a sales workflow.
+
+Regular
+
+It’s currently “task creation rules,” not a real automation platform yet.
+
+Layman
+
+Automations are basically “make a task when something happens.”
+
+What to do + how
+
+Expand automation gradually:
+
+implement notifications
+
+add scheduling/delays
+
+add webhook action later
+
+Make supported triggers/actions vertical-aware.
+
+9) Communications logging (Retention moat)
+
+Key findings
+
+Manual logging exists and is well-structured.
+
+Missing what makes it “dominant”:
+
+search (FTS)
+
+threading
+
+auto-logging integrations (Twilio/Gmail/Outlook/Slack)
+
+communication-based triggers/reports/scoring
+
+Regular
+
+The doc recommends shifting to communication-first CRM:
+
+communication becomes the primary entity
+
+deals are inferred/linked
+
+comms drive scoring + automation + reporting
+
+Layman
+
+If Cadence captures all calls/texts/emails automatically, users will never leave.
+
+Right now it’s still too manual.
+
+What to do + how
+
+Add:
+
+full-text search on comms
+
+comm-based automations (“no response in 7 days”)
+
+comm-based reporting (“deals with no contact in 10 days”)
+
+Integrate Twilio later, but the internal structure can be built now.
+
+10) Contact model (import/dedupe)
+
+Key findings
+
+Contact model is flat and B2B-biased (company as text, LinkedIn, titles).
+
+No company_id relationship.
+
+No CSV import and no dedupe.
+
+Regular
+
+This will hurt multi-vertical because residential services often aren’t “company contacts,” they’re homeowners/consumers.
+
+B2B needs account relationships; consumer services need household-style contacts.
+
+Layman
+
+You can’t easily prevent duplicates or import lists of customers/leads.
+
+What to do + how
+
+Add:
+
+companies table + company_id FK (for B2B)
+
+dedupe rules (email/phone normalized)
+
+CSV import pipeline (even basic first)
+
+Allow contacts to be “person-only” without company emphasis.
+
+11) Intake form system
+
+Key findings
+
+Schema exists (templates + submissions) but:
+
+no builder UI
+
+submissions are JSON blobs with no mapping
+
+no automation off submissions
+
+Regular
+
+Good foundation; needs:
+
+builder
+
+validation
+
+mapping intake fields → contact/deal fields
+
+triggers (“intake submitted” → create deal/task)
+
+Layman
+
+You have the database tables, but not the actual usable feature.
+
+What to do + how
+
+Build basic builder later.
+
+First: make intake submissions create a deal + contact reliably.
+
+The most important architectural findings (the “real engineering” issues)
+1) Two different industry systems
+
+CRM industry types ≠ Radar industry types
+
+Mapping is implicit and wrong for many future verticals
+Fix: unified vertical definition, single source of truth.
+
+2) Hardcoded configs don’t scale
+
+New verticals require deploys; customers can’t customize
+Fix: database-driven templates + org overrides.
+
+3) Schema pollution
+
+Adding photographer-specific fields into deals will spiral
+Fix: vertical fields/custom fields system instead of new columns.
+
+4) Automation + suggested tasks are sales-biased
+
+“qualify/proposal” logic is baked into the experience
+Fix: vertical-aware playbooks/templates and comm-based triggers.
+
+What-to + How-to (the doc’s implementation plan)
+What to do
+
+Build unified vertical abstraction layer (one definition of an industry)
+
+Add database-driven templates + org overrides
+
+Decouple Radar from CRM industry type
+
+Add scoring abstraction with weights (configurable)
+
+Turn communications into the retention engine (search + triggers + reports)
+
+How to do it (the practical sequence)
+
+Week 1: add template tables in DB (no UI yet, keep backward compatibility)
+
+Weeks 2–3: update app to read DB templates first, fallback to TS configs
+
+Week 3: seed templates from existing hardcoded configs
+
+Week 4+: add admin UI for overrides/customization
+
+Later: scoring engine + deeper automations
