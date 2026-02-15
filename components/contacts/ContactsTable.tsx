@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Mail, Phone, Building2, MoreHorizontal, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
+import { CompanyLogo, ContactAvatar } from '@/components/shared/Avatars'
 
 interface Contact {
   id: string
@@ -106,9 +107,12 @@ export default function ContactsTable({ contacts }: ContactsTableProps) {
                     href={`/contacts/${contact.id}`}
                     className="flex items-center gap-3 group/link"
                   >
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-cadence-pink to-cadence-teal flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
-                      {contact.first_name[0]}{contact.last_name[0]}
-                    </div>
+                    <ContactAvatar
+                      firstName={contact.first_name}
+                      lastName={contact.last_name}
+                      email={contact.email}
+                      size="md"
+                    />
                     <div>
                       <p className="font-medium text-gray-900 group-hover/link:text-primary-600 transition-colors">
                         {contact.first_name} {contact.last_name}
@@ -153,7 +157,7 @@ export default function ContactsTable({ contacts }: ContactsTableProps) {
                         href={`/companies/${company.id}`}
                         className="text-sm text-gray-600 hover:text-primary-600 transition-colors flex items-center gap-1.5"
                       >
-                        <Building2 size={14} />
+                        <CompanyLogo name={company.name} email={contact.email} size="xs" />
                         {company.name}
                       </Link>
                     ) : (

@@ -17,6 +17,7 @@ import {
   MessageSquarePlus,
   Lock,
   BookOpen,
+  Activity,
   LucideIcon
 } from 'lucide-react'
 import clsx from 'clsx'
@@ -58,6 +59,7 @@ function getNavigation(terminology: ReturnType<typeof getTerminology>): NavItem[
     { name: terminology.deals, href: '/deals', icon: Handshake },
     { name: terminology.tasks, href: '/tasks', icon: CheckSquare },
     { name: terminology.reports, href: '/reports', icon: BarChart3, adminOnly: true },
+    { name: 'Activity', href: '/activity', icon: Activity },
     { name: 'Prospector', href: '/prospector', icon: Zap, requireFeature: 'showProspector' },
   ]
 }

@@ -19,8 +19,15 @@ import {
   CheckSquare,
   MessageSquare,
   Clock,
-  Paperclip
+  Paperclip,
+  Sparkles,
+  Loader2,
+  Globe,
+  Linkedin,
+  Twitter
 } from 'lucide-react'
+import { ContactAvatar, CompanyLogo } from '@/components/shared/Avatars'
+import { extractDomain, getCompanyLogoUrl } from '@/lib/enrichment'
 import { formatDistanceToNow } from 'date-fns'
 import ActivityTimeline from '@/components/shared/ActivityTimeline'
 import CreateTaskModal from '@/components/tasks/CreateTaskModal'
@@ -42,7 +49,10 @@ interface Contact {
   country: string | null
   notes: string | null
   created_at: string
-  companies: { id: string; name: string } | null
+  avatar_url: string | null
+  enrichment_data: any | null
+  enriched_at: string | null
+  companies: { id: string; name: string; logo_url?: string; domain?: string; linkedin_url?: string; twitter_url?: string; description?: string; employee_count?: string } | null
 }
 
 interface Deal {
@@ -93,6 +103,8 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
   const [commRefreshKey, setCommRefreshKey] = useState(0)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [enriching, setEnriching] = useState(false)
+  const [enrichmentData, setEnrichmentData] = useState<any>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -142,7 +154,7 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
     const [contactRes, dealsRes, tasksRes, activitiesRes] = await Promise.all([
       supabase
         .from('contacts')
-        .select('*, companies(id, name)')
+        .select('*, companies(*)')
         .eq('id', params.id)
         .eq('org_id', orgId)
         .single(),
@@ -193,6 +205,34 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
     loadContact()
   }
 
+  const handleEnrich = async () => {
+    if (!contact) return
+    setEnriching(true)
+
+    try {
+      const res = await fetch('/api/enrichment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contact_id: contact.id,
+          company_id: contact.company_id,
+        }),
+      })
+
+      const data = await res.json()
+      if (data.success) {
+        setEnrichmentData(data)
+        loadContact() // Refresh to get updated data
+      }
+    } catch (err) {
+      console.error('Enrichment failed:', err)
+    }
+    setEnriching(false)
+  }
+
+  const domain = extractDomain(contact?.email)
+  const canEnrich = contact && domain && !contact.enriched_at
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -225,9 +265,13 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-cadence-pink to-cadence-teal flex items-center justify-center text-white text-xl font-semibold">
-              {initials}
-            </div>
+            <ContactAvatar
+              firstName={contact.first_name}
+              lastName={contact.last_name}
+              email={contact.email}
+              avatarUrl={contact.avatar_url}
+              size="xl"
+            />
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{fullName}</h1>
               {contact.title && (
@@ -345,6 +389,75 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
               </div>
             </div>
           </div>
+
+          {/* Company / Enrichment */}
+          {(contact.companies || domain) && (
+            <div className="card p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-gray-900">Company</h3>
+                {canEnrich && (
+                  <button
+                    onClick={handleEnrich}
+                    disabled={enriching}
+                    className="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
+                  >
+                    {enriching ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                    {enriching ? 'Enriching...' : 'Enrich'}
+                  </button>
+                )}
+                {contact.enriched_at && (
+                  <span className="text-[10px] text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full font-medium">Enriched</span>
+                )}
+              </div>
+              <div className="space-y-3">
+                {/* Company header with logo */}
+                {(contact.companies || domain) && (
+                  <div className="flex items-center gap-3">
+                    <CompanyLogo
+                      domain={domain || contact.companies?.domain}
+                      logoUrl={contact.companies?.logo_url}
+                      email={contact.email}
+                      name={contact.companies?.name || domain}
+                      size="lg"
+                    />
+                    <div>
+                      {contact.companies ? (
+                        <Link href={`/companies/${contact.companies.id}`} className="font-medium text-gray-900 hover:text-primary-600">
+                          {contact.companies.name}
+                        </Link>
+                      ) : domain ? (
+                        <p className="font-medium text-gray-900">{domain}</p>
+                      ) : null}
+                      {contact.companies?.description && (
+                        <p className="text-xs text-gray-500 line-clamp-2 mt-0.5">{contact.companies.description}</p>
+                      )}
+                      {contact.companies?.employee_count && (
+                        <p className="text-xs text-gray-400 mt-0.5">{contact.companies.employee_count} employees</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {/* Social links */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {domain && (
+                    <a href={`https://${domain}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-primary-600 bg-gray-50 px-2 py-1 rounded-md">
+                      <Globe size={12} /> {domain}
+                    </a>
+                  )}
+                  {contact.companies?.linkedin_url && (
+                    <a href={contact.companies.linkedin_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-blue-600 bg-gray-50 px-2 py-1 rounded-md">
+                      <Linkedin size={12} /> LinkedIn
+                    </a>
+                  )}
+                  {contact.companies?.twitter_url && (
+                    <a href={contact.companies.twitter_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-sky-500 bg-gray-50 px-2 py-1 rounded-md">
+                      <Twitter size={12} /> Twitter
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Deals */}
           <div className="card p-6">

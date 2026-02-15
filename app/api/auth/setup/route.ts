@@ -116,6 +116,7 @@ export async function POST(request: NextRequest) {
       await supabase.from('pipeline_stages').insert(
         defaultStages.map((stage) => ({
           ...stage,
+          org_id: org.id,
           pipeline_id: pipeline.id,
         }))
       )

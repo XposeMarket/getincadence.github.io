@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Search, Bell, Plus, LogOut, ChevronDown, Users, Building2, Handshake, CheckSquare, Menu, Calendar, Clock, Activity } from 'lucide-react'
+import GlobalSearch from '@/components/dashboard/GlobalSearch'
 import CreateContactModal from '@/components/contacts/CreateContactModal'
 import CreateCompanyModal from '@/components/companies/CreateCompanyModal'
 import CreateTaskModal from '@/components/tasks/CreateTaskModal'
@@ -40,8 +41,7 @@ export default function Header({ user, onMenuClick }: HeaderProps) {
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
-  const [searchQuery, setSearchQuery] = useState('')
-  const [showMobileSearch, setShowMobileSearch] = useState(false)
+
   const [activeModal, setActiveModal] = useState<'contact' | 'company' | 'deal' | 'task' | null>(null)
   const router = useRouter()
   const supabase = createClient()
@@ -192,23 +192,17 @@ export default function Header({ user, onMenuClick }: HeaderProps) {
             <Menu size={22} />
           </button>
 
-          {/* Desktop search */}
+          {/* Search */}
           <div className="hidden sm:block flex-1 max-w-xl">
-            <div className="relative">
-              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search contacts, deals, companies..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg placeholder-gray-400 focus:bg-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors"
-              />
-            </div>
+            <GlobalSearch />
           </div>
 
           {/* Mobile search button */}
           <button 
-            onClick={() => setShowMobileSearch(!showMobileSearch)}
+            onClick={() => {
+              // Focus the search input on mobile by dispatching Cmd+K
+              window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))
+            }}
             className="sm:hidden p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <Search size={20} />
@@ -348,23 +342,6 @@ export default function Header({ user, onMenuClick }: HeaderProps) {
           </div>
         </div>
       </header>
-
-      {/* Mobile search bar - expandable */}
-      {showMobileSearch && (
-        <div className="sm:hidden px-3 py-2 bg-white border-b border-gray-200">
-          <div className="relative">
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              autoFocus
-              className="w-full pl-10 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg placeholder-gray-400 focus:bg-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors"
-            />
-          </div>
-        </div>
-      )}
 
       {activeModal === 'contact' && (
         <CreateContactModal onClose={handleModalClose} onCreated={handleCreated} />
