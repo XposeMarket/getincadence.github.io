@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { ActivityLogger } from "@/lib/activity-logger";
 import { onDealCreated } from "@/lib/automation-engine";
+import { mapPlacesDataToCompany, buildPlacesEnrichmentData, extractDomainFromUrl, getCompanyLogoUrl } from "@/lib/enrichment";
 
 /**
  * POST /api/revenue-radar/create-opportunity
@@ -17,10 +18,12 @@ import { onDealCreated } from "@/lib/automation-engine";
  * Returns: { dealId, companyId?, dealUrl }
  */
 export async function POST(req: NextRequest) {
-  const supabase = createClient();
+  // Use cookie client for auth, admin client for DB writes (bypasses RLS)
+  const authClient = createClient();
+  const supabase = createAdminClient();
 
   // Auth
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const { data: { user }, error: authError } = await authClient.auth.getUser();
   if (authError || !user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -42,6 +45,9 @@ export async function POST(req: NextRequest) {
   if (!lead) {
     return NextResponse.json({ error: "No lead data provided" }, { status: 400 });
   }
+
+  console.log("[Create Opportunity] Lead data keys:", Object.keys(lead));
+  console.log("[Create Opportunity] Lead website:", lead.website, "| phone:", lead.phone, "| address:", lead.address);
 
   // ── Usage limit check ───────────────────────────────────────
   try {
@@ -164,7 +170,18 @@ export async function POST(req: NextRequest) {
 
     if (existingCompany && existingCompany.length > 0) {
       companyId = existingCompany[0].id;
+
+      // Try enriching with Places data (non-critical, columns may not exist yet)
+      try {
+        const placesFields = mapPlacesDataToCompany(lead);
+        const enrichmentBlob = buildPlacesEnrichmentData(lead);
+        await supabase.from("companies").update({
+          ...placesFields,
+          enrichment_data: enrichmentBlob,
+        }).eq("id", companyId);
+      } catch { /* enrichment columns may not exist yet */ }
     } else {
+      // Create new company — base fields first, then try enrichment
       const companyData: Record<string, any> = {
         name: bizName,
         org_id: orgId,
@@ -176,13 +193,35 @@ export async function POST(req: NextRequest) {
       };
       if (lead.category) companyData.industry = lead.category;
 
+      // Try adding enrichment fields (may fail pre-migration, that's ok)
+      try {
+        const placesFields = mapPlacesDataToCompany(lead);
+        Object.assign(companyData, placesFields);
+        companyData.enrichment_data = buildPlacesEnrichmentData(lead);
+      } catch { /* non-critical */ }
+
       const { data: newCompany, error: compError } = await supabase
         .from("companies")
         .insert(companyData)
         .select("id")
         .single();
 
-      if (!compError && newCompany) {
+      if (compError) {
+        // If insert failed (likely due to enrichment columns), retry without them
+        const baseData = {
+          name: bizName, org_id: orgId,
+          address: lead.address || null, city: lead.city || null,
+          state: lead.state || null, website: lead.website || null,
+          phone: lead.phone || null,
+          ...(lead.category ? { industry: lead.category } : {}),
+        };
+        const { data: retryCompany, error: retryErr } = await supabase
+          .from("companies")
+          .insert(baseData)
+          .select("id")
+          .single();
+        if (!retryErr && retryCompany) companyId = retryCompany.id;
+      } else if (newCompany) {
         companyId = newCompany.id;
       }
     }

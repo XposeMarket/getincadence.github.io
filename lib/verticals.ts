@@ -69,6 +69,7 @@ export interface FeatureFlags {
   showForecast: boolean
   showConversionFunnel: boolean
   showSalesVelocity: boolean
+  showEnrichment: boolean
 }
 
 // ─── Pipeline Stage ───────────────────────────────────────────────────────────
@@ -182,7 +183,7 @@ function makeResidentialRadar(trade: string, label: string): VerticalRadarConfig
     label,
     description: 'Home lifecycle intelligence — targeted to your trade',
     dataSources: ['US Census', 'NOAA Storm Data', 'Permit Datasets', 'Google Geocoding'],
-    maxRadiusMiles: 50,
+    maxRadiusMiles: 30,
     maxResults: 200,
     signals: RESIDENTIAL_SIGNALS,
     panelFields: RESIDENTIAL_PANEL_FIELDS,
@@ -216,7 +217,7 @@ const B2B_RADAR: VerticalRadarConfig = {
   label: 'B2B Service',
   description: 'Marketing, IT, Consulting — business prospecting',
   dataSources: ['Google Places API', 'Business Directories', 'Website Signals'],
-  maxRadiusMiles: 25,
+  maxRadiusMiles: 30,
   maxResults: 200,
   signals: B2B_SIGNALS,
   panelFields: B2B_PANEL_FIELDS,
@@ -270,6 +271,7 @@ const SALES_TERMINOLOGY: Terminology = {
 const DEFAULT_FEATURES: FeatureFlags = {
   showCompanies: true, showProspector: true, showPlanner: true,
   showSalesReports: true, showForecast: true, showConversionFunnel: true, showSalesVelocity: true,
+  showEnrichment: true,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -432,7 +434,7 @@ const PHOTOGRAPHER: VerticalDefinition = {
     contacts: 'Clients', contact: 'Client', tasks: 'To-Dos', task: 'To-Do',
     reports: 'Insights', closeDate: 'Event Date', dealAmount: 'Package Price', activity: 'Activity',
   },
-  features: { ...DEFAULT_FEATURES, showCompanies: false },
+  features: { ...DEFAULT_FEATURES, showCompanies: false, showEnrichment: false },
   defaultPipelineStages: [
     { name: 'Inquiry', position: 1, color: '#94A3B8' }, { name: 'Booked', position: 2, color: '#3B82F6' },
     { name: 'Shoot Complete', position: 3, color: '#F59E0B' }, { name: 'Editing', position: 4, color: '#8B5CF6' },
@@ -457,7 +459,7 @@ const BARBERSHOP: VerticalDefinition = {
     contacts: 'Clients', contact: 'Client', tasks: 'Tasks', task: 'Task',
     reports: 'Reports', closeDate: 'Appointment Date', dealAmount: 'Service Price', activity: 'Activity',
   },
-  features: { ...DEFAULT_FEATURES, showCompanies: false, showProspector: false },
+  features: { ...DEFAULT_FEATURES, showCompanies: false, showProspector: false, showEnrichment: false },
   defaultPipelineStages: [
     { name: 'Inquiry', position: 1, color: '#94A3B8' }, { name: 'Booked', position: 2, color: '#3B82F6' },
     { name: 'Completed', position: 3, color: '#10B981', is_won: true }, { name: 'Repeat Client', position: 4, color: '#8B5CF6', is_won: true },

@@ -191,7 +191,7 @@ export default function ProspectorPage() {
   const [selectedTrade, setSelectedTrade] = useState<ResidentialTrade>(initialTrade);
   const [selectedNiche, setSelectedNiche] = useState<PhotographerNiche>("general_photo");
   const [selectedLead, setSelectedLead] = useState<any>(null);
-  const [radius, setRadius] = useState(15);
+  const [radius, setRadius] = useState(10);
   const [filters, setFilters] = useState<Record<string, boolean>>({});
   const [geoData, setGeoData] = useState<any>({ leads: null, permits: null, storms: null, neighborhoods: null });
   const [loading, setLoading] = useState(false);

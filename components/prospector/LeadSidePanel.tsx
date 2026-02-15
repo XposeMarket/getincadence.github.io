@@ -148,15 +148,26 @@ const LeadSidePanel: React.FC<LeadSidePanelProps> = ({
     setCreateError(null);
 
     try {
+      // Merge placeDetails into lead so the API has full data (website, phone, hours, etc.)
+      const enrichedLead = {
+        ...lead,
+        reasons: Array.isArray(lead.reasons) ? lead.reasons : [],
+        // Overlay place details if available
+        ...(placeDetails ? {
+          website: placeDetails.website || lead.website,
+          phone: placeDetails.formatted_phone_number || lead.phone,
+          address: placeDetails.formatted_address || lead.address,
+          businessHours: placeDetails.opening_hours?.weekday_text || null,
+          placeTypes: placeDetails.types || null,
+          placePhotos: placeDetails.photos?.slice(0, 5) || null,
+        } : {}),
+      };
+
       const res = await fetch("/api/revenue-radar/create-opportunity", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          lead: {
-            ...lead,
-            // Ensure reasons is serialized properly
-            reasons: Array.isArray(lead.reasons) ? lead.reasons : [],
-          },
+          lead: enrichedLead,
           industry: radarIndustry || radarConfig.id || "residential_service",
           trade: selectedTrade || "general",
         }),

@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { enrichCompanyByDomain, extractDomain, getCompanyLogoUrl } from '@/lib/enrichment'
+import { extractDomain, extractDomainFromUrl, getCompanyLogoUrl, scrapeDomainMeta } from '@/lib/enrichment'
 
+/**
+ * POST /api/enrichment
+ * 
+ * Enriches a contact and/or company using domain meta scraping.
+ * Dedup: skips if already enriched (enriched_at is set).
+ * 
+ * Body: { contact_id?, company_id?, domain? }
+ */
 export async function POST(request: NextRequest) {
   try {
     const { contact_id, company_id, domain: rawDomain } = await request.json()
@@ -13,38 +21,53 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminClient()
     let domain = rawDomain
 
-    // If enriching a contact, extract domain from their email
-    if (contact_id && !domain) {
+    // ── Dedup check + domain resolution for contacts ──────────
+    if (contact_id) {
       const { data: contact } = await supabase
         .from('contacts')
-        .select('email, company')
+        .select('email, company_id, enriched_at')
         .eq('id', contact_id)
         .single()
 
-      if (!contact?.email) {
-        return NextResponse.json({ error: 'Contact has no email' }, { status: 400 })
+      if (!contact) {
+        return NextResponse.json({ error: 'Contact not found' }, { status: 404 })
       }
 
-      domain = extractDomain(contact.email)
+      // Already enriched — skip
+      if (contact.enriched_at) {
+        return NextResponse.json({ success: true, skipped: true, reason: 'already_enriched' })
+      }
+
+      if (!domain && contact.email) {
+        domain = extractDomain(contact.email)
+      }
+
       if (!domain) {
-        return NextResponse.json({ error: 'Personal email domain — no company data available' }, { status: 400 })
+        return NextResponse.json({ error: 'No business email domain found' }, { status: 400 })
       }
     }
 
-    // If enriching a company, get domain from website or provided domain
-    if (company_id && !domain) {
+    // ── Dedup check + domain resolution for companies ─────────
+    if (company_id && !contact_id) {
       const { data: company } = await supabase
         .from('companies')
-        .select('website, domain, name')
+        .select('website, domain, name, enriched_at')
         .eq('id', company_id)
         .single()
 
-      if (company?.domain) {
-        domain = company.domain
-      } else if (company?.website) {
-        domain = company.website.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0]
-      } else if (company?.name) {
-        // Try name-based domain guess
+      if (!company) {
+        return NextResponse.json({ error: 'Company not found' }, { status: 404 })
+      }
+
+      if (company.enriched_at) {
+        return NextResponse.json({ success: true, skipped: true, reason: 'already_enriched' })
+      }
+
+      if (!domain) {
+        domain = company.domain || extractDomainFromUrl(company.website)
+      }
+      if (!domain && company.name) {
+        // Last resort: guess domain from name
         domain = company.name.toLowerCase().replace(/[^a-z0-9]/g, '') + '.com'
       }
     }
@@ -53,44 +76,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Could not determine domain for enrichment' }, { status: 400 })
     }
 
-    // Try full Clearbit enrichment (if API key configured)
-    const enrichment = await enrichCompanyByDomain(domain)
+    // ── Scrape domain meta ────────────────────────────────────
+    const meta = await scrapeDomainMeta(domain)
+    const logoUrl = getCompanyLogoUrl(domain)
 
-    // Always get logo URL (free, no API key)
-    const logoUrl = enrichment?.logo_url || getCompanyLogoUrl(domain)
+    // Build enrichment data blob
+    const enrichmentData: Record<string, any> = {
+      source: 'domain_scrape',
+      domain,
+      logo_url: logoUrl,
+    }
+    if (meta) {
+      enrichmentData.title = meta.title
+      enrichmentData.description = meta.description || meta.ogDescription
+      enrichmentData.og_image = meta.ogImage
+      enrichmentData.og_title = meta.ogTitle
+      enrichmentData.favicon = meta.favicon
+    }
 
-    // Update contact
+    const description = meta?.ogDescription || meta?.description || null
+    const companyName = meta?.ogTitle || meta?.title || null
+
+    // ── Update contact ────────────────────────────────────────
     if (contact_id) {
-      const updateData: any = {
-        enrichment_data: enrichment?.raw || { domain, logo_url: logoUrl },
+      const contactUpdate: Record<string, any> = {
+        enrichment_data: enrichmentData,
+        enrichment_source: 'domain_scrape',
         enriched_at: new Date().toISOString(),
       }
-      if (logoUrl) updateData.avatar_url = logoUrl
+      if (logoUrl) contactUpdate.avatar_url = logoUrl
 
-      await supabase.from('contacts').update(updateData).eq('id', contact_id)
-    }
+      await supabase.from('contacts').update(contactUpdate).eq('id', contact_id)
 
-    // Update company
-    if (company_id) {
-      const updateData: any = {
-        domain,
-        enriched_at: new Date().toISOString(),
-      }
-      if (logoUrl) updateData.logo_url = logoUrl
-      if (enrichment) {
-        updateData.enrichment_data = enrichment.raw
-        if (enrichment.description) updateData.description = enrichment.description
-        if (enrichment.employee_count) updateData.employee_count = enrichment.employee_count
-        if (enrichment.linkedin_url) updateData.linkedin_url = enrichment.linkedin_url
-        if (enrichment.twitter_url) updateData.twitter_url = enrichment.twitter_url
-        if (enrichment.facebook_url) updateData.facebook_url = enrichment.facebook_url
-      }
-
-      await supabase.from('companies').update(updateData).eq('id', company_id)
-    }
-
-    // If it's a contact with a company_id, also try updating the company
-    if (contact_id && !company_id) {
+      // Also enrich the linked company if it hasn't been enriched yet
       const { data: contact } = await supabase
         .from('contacts')
         .select('company_id')
@@ -98,34 +116,49 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (contact?.company_id) {
-        const companyUpdate: any = { domain }
-        if (logoUrl) companyUpdate.logo_url = logoUrl
-        if (enrichment?.description) companyUpdate.description = enrichment.description
-        if (enrichment?.employee_count) companyUpdate.employee_count = enrichment.employee_count
-        if (enrichment?.linkedin_url) companyUpdate.linkedin_url = enrichment.linkedin_url
-
-        await supabase.from('companies')
-          .update(companyUpdate)
+        const { data: company } = await supabase
+          .from('companies')
+          .select('enriched_at')
           .eq('id', contact.company_id)
-          .is('enriched_at', null) // Only if not already enriched
+          .single()
+
+        if (company && !company.enriched_at) {
+          const companyUpdate: Record<string, any> = {
+            domain,
+            enrichment_data: enrichmentData,
+            enrichment_source: 'domain_scrape',
+            enriched_at: new Date().toISOString(),
+          }
+          if (logoUrl) companyUpdate.logo_url = logoUrl
+          if (description) companyUpdate.description = description
+
+          await supabase.from('companies').update(companyUpdate).eq('id', contact.company_id)
+        }
       }
+    }
+
+    // ── Update company directly ───────────────────────────────
+    if (company_id) {
+      const companyUpdate: Record<string, any> = {
+        domain,
+        enrichment_data: enrichmentData,
+        enrichment_source: 'domain_scrape',
+        enriched_at: new Date().toISOString(),
+      }
+      if (logoUrl) companyUpdate.logo_url = logoUrl
+      if (description) companyUpdate.description = description
+
+      await supabase.from('companies').update(companyUpdate).eq('id', company_id)
     }
 
     return NextResponse.json({
       success: true,
       domain,
       logo_url: logoUrl,
-      enrichment: enrichment ? {
-        name: enrichment.name,
-        description: enrichment.description,
-        industry: enrichment.industry,
-        employee_count: enrichment.employee_count,
-        location: enrichment.location,
-        linkedin_url: enrichment.linkedin_url,
-        twitter_url: enrichment.twitter_url,
-        facebook_url: enrichment.facebook_url,
-        founded_year: enrichment.founded_year,
-        annual_revenue: enrichment.annual_revenue,
+      meta: meta ? {
+        title: meta.title,
+        description: meta.description || meta.ogDescription,
+        og_image: meta.ogImage,
       } : null,
     })
   } catch (error) {

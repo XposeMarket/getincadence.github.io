@@ -29,6 +29,7 @@ import {
 import { ContactAvatar, CompanyLogo } from '@/components/shared/Avatars'
 import { extractDomain, getCompanyLogoUrl } from '@/lib/enrichment'
 import { formatDistanceToNow } from 'date-fns'
+import { useIndustry } from '@/lib/contexts/IndustryContext'
 import ActivityTimeline from '@/components/shared/ActivityTimeline'
 import CreateTaskModal from '@/components/tasks/CreateTaskModal'
 import FilesList, { FileRecord } from '@/components/files/FilesList'
@@ -51,8 +52,16 @@ interface Contact {
   created_at: string
   avatar_url: string | null
   enrichment_data: any | null
+  enrichment_source: string | null
   enriched_at: string | null
-  companies: { id: string; name: string; logo_url?: string; domain?: string; linkedin_url?: string; twitter_url?: string; description?: string; employee_count?: string } | null
+  companies: {
+    id: string; name: string; logo_url?: string; domain?: string;
+    description?: string; category?: string;
+    google_rating?: number; google_review_count?: number;
+    google_place_id?: string; business_hours?: any;
+    employee_count?: string; linkedin_url?: string; twitter_url?: string; facebook_url?: string;
+    enrichment_source?: string; enriched_at?: string;
+  } | null
 }
 
 interface Deal {
@@ -107,6 +116,7 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
   const [enrichmentData, setEnrichmentData] = useState<any>(null)
   const router = useRouter()
   const supabase = createClient()
+  const { config } = useIndustry()
 
   useEffect(() => {
     const initOrg = async () => {
@@ -231,7 +241,9 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
   }
 
   const domain = extractDomain(contact?.email)
-  const canEnrich = contact && domain && !contact.enriched_at
+  const enrichmentEnabled = config.features.showEnrichment
+  const canEnrich = enrichmentEnabled && contact && domain && !contact.enriched_at
+  const isEnriched = contact?.enriched_at != null
 
   if (loading) {
     return (
@@ -254,7 +266,8 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
 
   const fullName = `${contact.first_name} ${contact.last_name}`
   const initials = `${contact.first_name[0]}${contact.last_name[0]}`.toUpperCase()
-  const location = [contact.city, contact.state, contact.country].filter(Boolean).join(', ')
+  const fullAddress = [contact.address, contact.city, contact.state, contact.zip, contact.country].filter(Boolean).join(', ')
+  const contactMapsUrl = fullAddress ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}` : null
 
   return (
     <div className="space-y-6">
@@ -375,10 +388,10 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
                   </Link>
                 </div>
               )}
-              {location && (
+              {fullAddress && (
                 <div className="flex items-center gap-3 text-sm">
                   <MapPin size={16} className="text-gray-400" />
-                  <span className="text-gray-600">{location}</span>
+                  <a href={contactMapsUrl!} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-primary-600">{fullAddress}</a>
                 </div>
               )}
               <div className="flex items-center gap-3 text-sm">
@@ -391,7 +404,7 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
           </div>
 
           {/* Company / Enrichment */}
-          {(contact.companies || domain) && (
+          {(contact.companies || (enrichmentEnabled && domain)) && (
             <div className="card p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-gray-900">Company</h3>
@@ -405,43 +418,54 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
                     {enriching ? 'Enriching...' : 'Enrich'}
                   </button>
                 )}
-                {contact.enriched_at && (
+                {isEnriched && (
                   <span className="text-[10px] text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full font-medium">Enriched</span>
                 )}
               </div>
               <div className="space-y-3">
                 {/* Company header with logo */}
-                {(contact.companies || domain) && (
-                  <div className="flex items-center gap-3">
-                    <CompanyLogo
-                      domain={domain || contact.companies?.domain}
-                      logoUrl={contact.companies?.logo_url}
-                      email={contact.email}
-                      name={contact.companies?.name || domain}
-                      size="lg"
-                    />
-                    <div>
-                      {contact.companies ? (
-                        <Link href={`/companies/${contact.companies.id}`} className="font-medium text-gray-900 hover:text-primary-600">
-                          {contact.companies.name}
-                        </Link>
-                      ) : domain ? (
-                        <p className="font-medium text-gray-900">{domain}</p>
-                      ) : null}
-                      {contact.companies?.description && (
-                        <p className="text-xs text-gray-500 line-clamp-2 mt-0.5">{contact.companies.description}</p>
-                      )}
-                      {contact.companies?.employee_count && (
-                        <p className="text-xs text-gray-400 mt-0.5">{contact.companies.employee_count} employees</p>
-                      )}
+                <div className="flex items-center gap-3">
+                  <CompanyLogo
+                    domain={domain || contact.companies?.domain}
+                    logoUrl={contact.companies?.logo_url}
+                    email={contact.email}
+                    name={contact.companies?.name || domain}
+                    size="lg"
+                  />
+                  <div>
+                    {contact.companies ? (
+                      <Link href={`/companies/${contact.companies.id}`} className="font-medium text-gray-900 hover:text-primary-600">
+                        {contact.companies.name}
+                      </Link>
+                    ) : domain ? (
+                      <p className="font-medium text-gray-900">{domain}</p>
+                    ) : null}
+                    {contact.companies?.description && (
+                      <p className="text-xs text-gray-500 line-clamp-2 mt-0.5">{contact.companies.description}</p>
+                    )}
+                    {contact.companies?.category && (
+                      <p className="text-xs text-gray-400 mt-0.5">{contact.companies.category}</p>
+                    )}
+                  </div>
+                </div>
+                {/* Google rating (from Places enrichment) */}
+                {contact.companies?.google_rating && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <div className="flex items-center gap-1 text-yellow-500">
+                      {'★'.repeat(Math.round(contact.companies.google_rating))}
+                      {'☆'.repeat(5 - Math.round(contact.companies.google_rating))}
                     </div>
+                    <span className="text-xs text-gray-500">
+                      {contact.companies.google_rating}/5
+                      {contact.companies.google_review_count ? ` (${contact.companies.google_review_count} reviews)` : ''}
+                    </span>
                   </div>
                 )}
-                {/* Social links */}
+                {/* Links */}
                 <div className="flex items-center gap-2 flex-wrap">
-                  {domain && (
-                    <a href={`https://${domain}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-primary-600 bg-gray-50 px-2 py-1 rounded-md">
-                      <Globe size={12} /> {domain}
+                  {(domain || contact.companies?.domain) && (
+                    <a href={`https://${domain || contact.companies?.domain}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-primary-600 bg-gray-50 px-2 py-1 rounded-md">
+                      <Globe size={12} /> {domain || contact.companies?.domain}
                     </a>
                   )}
                   {contact.companies?.linkedin_url && (

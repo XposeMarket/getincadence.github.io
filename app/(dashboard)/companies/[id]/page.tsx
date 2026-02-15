@@ -149,7 +149,8 @@ export default function CompanyDetailPage({ params }: { params: { id: string } }
 
   if (!company) return <div className="text-center py-12"><h2 className="text-xl font-semibold text-gray-900">Company not found</h2><Link href="/companies" className="text-primary-600 mt-2 inline-block">Back to companies</Link></div>
 
-  const location = [company.city, company.state, company.country].filter(Boolean).join(', ')
+  const fullAddress = [company.address, company.city, company.state, company.zip, company.country].filter(Boolean).join(', ')
+  const mapsUrl = fullAddress ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}` : null
   const totalDealValue = deals.reduce((sum, d) => sum + (d.value || 0), 0)
 
   return (
@@ -209,7 +210,7 @@ export default function CompanyDetailPage({ params }: { params: { id: string } }
             <div className="space-y-3 text-sm">
               {company.website && <div className="flex items-center gap-3"><Globe size={16} className="text-gray-400" /><a href={company.website.startsWith('http') ? company.website : `https://${company.website}`} target="_blank" className="text-gray-600 hover:text-primary-600">{company.website}</a></div>}
               {company.phone && <div className="flex items-center gap-3"><Phone size={16} className="text-gray-400" /><span className="text-gray-600">{company.phone}</span></div>}
-              {location && <div className="flex items-center gap-3"><MapPin size={16} className="text-gray-400" /><span className="text-gray-600">{location}</span></div>}
+              {fullAddress && <div className="flex items-center gap-3"><MapPin size={16} className="text-gray-400" /><a href={mapsUrl!} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-primary-600">{fullAddress}</a></div>}
               <div className="flex items-center gap-3"><Clock size={16} className="text-gray-400" /><span className="text-gray-500">Added {formatDistanceToNow(new Date(company.created_at), { addSuffix: true })}</span></div>
             </div>
           </div>
